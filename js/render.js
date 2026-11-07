@@ -37,6 +37,7 @@ const Render = {
     }
   },
 
+  // game = null — боя нет (меню и прочие экраны): только берег, небо и вода
   draw(game) {
     const ctx = this.ctx, s = this.s;
     const Wpx = this.canvas.width, Hpx = this.canvas.height;
@@ -74,6 +75,11 @@ const Render = {
 
     this.drawGround();
     this.drawFlagpole();
+    if (!game) {
+      this.buttons = [];
+      this.drawWater();
+      return;
+    }
     for (const b of game.fortress) if (b.alive) this.drawBrick(b);
     this.drawPlayerCannon(game.cannon);
     for (const g of game.fortGuns) if (g.alive) this.drawFortGun(g);
@@ -482,7 +488,7 @@ const Render = {
     ctx.textBaseline = 'middle';
 
     // Левая панель: пушка
-    const px = 12 * u, py = 12 * u, pw = 300 * u, ph = 132 * u;
+    const px = 12 * u, py = 12 * u, pw = 300 * u, ph = 144 * u;
     ctx.fillStyle = 'rgba(15, 25, 35, 0.72)';
     this.roundRect(px, py, pw, ph, 8 * u); ctx.fill();
     ctx.fillStyle = '#fff';
@@ -534,7 +540,8 @@ const Render = {
     this.buttons.push({ ...fb, fn: () => game.playerFire() });
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.font = `${11 * u}px system-ui, sans-serif`;
-    ctx.fillText('↑↓ / колесо — угол · ←→ — порох · Пробел — выстрел', px + 12 * u, py + 116 * u);
+    ctx.fillText('↑↓ / колесо — угол · ←→ — порох', px + 12 * u, py + 113 * u);
+    ctx.fillText('Пробел — выстрел · Q — ядро · Esc — пауза', px + 12 * u, py + 129 * u);
 
     // Правая панель: состояние
     ctx.font = `${14 * u}px system-ui, sans-serif`;
@@ -542,7 +549,7 @@ const Render = {
     ctx.fillStyle = 'rgba(15, 25, 35, 0.72)';
     this.roundRect(rx, ry, rw, 120 * u, 8 * u); ctx.fill();
     ctx.fillStyle = '#fff';
-    ctx.fillText(`Потоплено: ${game.sunk} / ${CFG.level.length}`, rx + 12 * u, ry + 18 * u);
+    ctx.fillText(`Потоплено: ${game.sunk} / ${CFG.fleet.length}`, rx + 12 * u, ry + 18 * u);
     const bar = (label, k, y, color) => {
       ctx.fillStyle = '#fff';
       ctx.fillText(label, rx + 12 * u, y);
@@ -573,7 +580,6 @@ const Render = {
       ctx.fillStyle = '#fff';
       ctx.font = `${20 * u}px system-ui, sans-serif`;
       ctx.fillText(game.message, this.canvas.width / 2, this.canvas.height / 2 + 20 * u);
-      ctx.fillText('R — сыграть ещё раз', this.canvas.width / 2, this.canvas.height / 2 + 54 * u);
       ctx.textAlign = 'left';
     }
   },

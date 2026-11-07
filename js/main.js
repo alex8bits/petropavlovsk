@@ -5,10 +5,37 @@ const MAX_POWDER = CFG.powderSpeed.length - 1;
 
 const Game = {
   state: 'play', // play | win | lose
+  active: false, // идёт ли бой (false — меню и прочие экраны)
+  paused: false,
+  level: null,   // данные текущего уровня (см. js/levels.js)
+  onEnd: null,   // вызывается с итогами боя, когда бой кончился и прошла пауза endDelay
+  endDelay: 2.5, // с: дать досмотреть, как тонет последний корабль
   time: 0,
   ground: null, fortress: [], cannon: null, fortGuns: [], ships: [], balls: [], looseBricks: [],
   spawnIndex: 0, sunk: 0, impacts: [], message: '',
   keys: {},
+
+  // Начать бой: собрать конфигурацию из базы, уровня и профиля и построить мир заново
+  start(level, profile = Profile.data) {
+    this.level = level;
+    CFG = Levels.buildConfig(level, profile);
+    this.reset();
+    this.active = true;
+    this.paused = false;
+  },
+
+  // Уничтожить бой целиком: ничего не переходит в следующий
+  stop() {
+    this.active = false;
+    this.paused = false;
+    this.level = null;
+    this.onEnd = null;
+    Physics.world = null;
+    Particles.list = [];
+    this.ground = null; this.cannon = null;
+    this.fortress = []; this.fortGuns = []; this.ships = []; this.balls = []; this.impacts = [];
+    this.keys = {};
+  },
 
   reset() {
     Physics.create();
@@ -20,6 +47,11 @@ const Game = {
     this.impacts = [];
     this.spawnIndex = 0;
     this.sunk = 0;
+    this.endTimer = 0;
+    this.endReported = false;
+    this.shots = 0;        // выстрелов игрока
+    this.hits = 0;         // из них попало в корабль (корпус, надстройка, пушка)
+    this.powderSpent = 0;  // мешков
     this.powder = CFG.powderStore.start; // мешков на складе
     this.powderTimer = 0;                  // сколько прошло с последнего подвоза
     this.ground = Entities.createGround();
@@ -99,6 +131,9 @@ const Game = {
   processImpacts() {
     for (const imp of this.impacts) {
       const { ball, target, x, y } = imp;
+      // Точность игрока: ядро его пушки задело корабль (считается один раз на ядро)
+      if (ball.owner === 'player' && !ball.fromFort && !ball.scored &&
+          (target.kind === 'shipGun' || this.shipOf(target))) { ball.scored = true; this.hits++; }
       // Вражеские ядра бьют по кладке сильнее на CFG.ships.shellPower (по пушке — как раньше)
       const boost = ball.owner !== 'player' && target.kind === 'brick';
       const energy = boost ? imp.energy * CFG.ships.shellPower : imp.energy;
@@ -318,6 +353,8 @@ const Game = {
     if (this.state !== 'play' || c.reload > 0 || c.hp <= 0) return;
     if (!this.canAffordShot()) return; // мало пороха — не стреляем, заряд не урезаем
     this.powder -= c.powder;
+    this.powderSpent += c.powder;
+    this.shots++;
     const a = c.angle * Math.PI / 180;
     const L = CFG.playerCannon.barrelLength;
     this.fireBall('player', c.ballType, c.pivot.x + Math.cos(a) * L, c.pivot.y + Math.sin(a) * L, a, c.powder);
@@ -409,7 +446,7 @@ const Game = {
     Physics.time += dt;
 
     // Появление кораблей
-    const lvl = CFG.level;
+    const lvl = CFG.fleet;
     while (this.spawnIndex < lvl.length && this.time >= lvl[this.spawnIndex].t) {
       const e = lvl[this.spawnIndex++];
       this.ships.push(Entities.createShip(e.type, CFG.world.width + 6, e.stopX));
@@ -510,6 +547,13 @@ const Game = {
     this.processImpacts();
     Particles.update(dt);
     this.checkEnd();
+    if (this.state !== 'play' && !this.endReported) {
+      this.endTimer += dt;
+      if (this.endTimer >= this.endDelay) {
+        this.endReported = true;
+        if (this.onEnd) this.onEnd(this.results());
+      }
+    }
   },
 
   // Доска надстройки потеряна: уничтожена или сбита со своего места на корпусе
@@ -591,40 +635,23 @@ const Game = {
   checkEnd() {
     if (this.state !== 'play') return;
     if (this.fortressIntegrity() < CFG.lose.fortressMinIntegrity) { this.state = 'lose'; this.message = 'Крепость разрушена'; return; }
-    if (this.spawnIndex >= CFG.level.length && this.sunk >= CFG.level.length) {
+    if (CFG.win === 'sinkAll' && this.spawnIndex >= CFG.fleet.length && this.sunk >= CFG.fleet.length) {
       this.state = 'win'; this.message = 'Все корабли потоплены!';
     }
   },
+
+  // Итоги боя и звёзды: 1 — победа, 2 — крепость цела больше чем на stars.fortress,
+  // 3 — пороха потрачено не больше stars.powder. Без победы звёзд нет.
+  results() {
+    const S = this.level.stars, win = this.state === 'win';
+    const integrity = this.fortressIntegrity();
+    return {
+      win, message: this.message,
+      sunk: this.sunk, total: CFG.fleet.length,
+      shots: this.shots, hits: this.hits,
+      accuracy: this.shots ? this.hits / this.shots : 0,
+      powderSpent: this.powderSpent, integrity, time: this.time,
+      stars: [win, win && integrity > S.fortress, win && this.powderSpent <= S.powder],
+    };
+  },
 };
-
-// ---------- Ввод ----------
-window.addEventListener('keydown', e => {
-  Game.keys[e.code] = true;
-  const c = Game.cannon;
-  if (e.code === 'Space') { e.preventDefault(); Game.playerFire(); }
-  // Порох: ← меньше, → больше (1–5 мешков)
-  if (e.code === 'ArrowRight') c.powder = Math.min(MAX_POWDER, c.powder + 1);
-  if (e.code === 'ArrowLeft') c.powder = Math.max(1, c.powder - 1);
-  if (e.code === 'KeyQ' || e.code === 'Tab') { e.preventDefault(); c.ballType = c.ballType === 'iron' ? 'heavy' : 'iron'; }
-  if (e.code === 'KeyR' && Game.state !== 'play') Game.reset();
-  if (e.code.startsWith('Arrow')) e.preventDefault();
-});
-window.addEventListener('keyup', e => { Game.keys[e.code] = false; });
-window.addEventListener('wheel', e => {
-  const pc = CFG.playerCannon, c = Game.cannon;
-  c.angle = Math.max(pc.minAngle, Math.min(pc.maxAngle, c.angle - Math.sign(e.deltaY)));
-}, { passive: true });
-
-// ---------- Запуск ----------
-Game.reset();
-Render.init(document.getElementById('game'));
-let last = performance.now(), acc = 0;
-function frame(now) {
-  acc += Math.min(0.1, (now - last) / 1000);
-  last = now;
-  const dt = CFG.world.step;
-  while (acc >= dt) { Game.step(dt); acc -= dt; }
-  Render.draw(Game);
-  requestAnimationFrame(frame);
-}
-requestAnimationFrame(frame);
