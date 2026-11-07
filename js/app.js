@@ -38,7 +38,9 @@ const App = {
       case 'briefing': {
         Game.stop();
         const level = Levels.get(data.id);
-        return level && Profile.isUnlocked(level) ? this.show('briefing', { level }) : this.show('map');
+        if (!level || !Profile.isUnlocked(level)) return this.show('map');
+        CFG = Levels.buildConfig(level, Profile.data); // фоном брифинга — берег этой батареи
+        return this.show('briefing', { level });
       }
       case 'start': return this.startBattle(Levels.get(data.id));
       case 'resume': return this.resume();
@@ -52,9 +54,14 @@ const App = {
     Game.stop();
     Game.start(level);
     Game.onEnd = res => {
+      const next = Levels.next(level);
+      const wasOpen = next && Profile.isUnlocked(next);
       const record = Profile.recordResult(level, res);
+      // Бой, который открылся этим результатом, и конец кампании — для сообщения на экране итогов
+      const unlocked = next && !wasOpen && Profile.isUnlocked(next) ? next : null;
+      const finished = res.win && !next;
       // Бой идёт дальше за экраном итогов (ввод выключен) и уничтожается, когда игрок с него уйдёт
-      this.show('results', { level, res, record });
+      this.show('results', { level, res, record, unlocked, finished });
     };
     this.show('battle');
   },

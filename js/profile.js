@@ -63,8 +63,9 @@ const Profile = {
     this.save();
   },
 
+  // Прогресс — только по боям, которые есть в кампании (записи удалённых боёв не считаются)
   hasProgress() {
-    return Object.keys(this.data.levels).length > 0;
+    return Levels.list.some(l => this.data.levels[l.id]);
   },
 
   levelRecord(id) {
@@ -76,13 +77,26 @@ const Profile = {
   },
 
   totalStars() {
-    return Object.keys(this.data.levels).reduce((n, id) => n + this.starCount(id), 0);
+    return Levels.list.reduce((n, l) => n + this.starCount(l.id), 0);
   },
 
-  // Первый бой открыт всегда, следующий — после победы в предыдущем
+  // Бой открыт, если выигран предыдущий; первому бою главы нужно ещё и набрать звёзды главы
   isUnlocked(level) {
     const prev = Levels.prev(level);
-    return !prev || this.levelRecord(prev.id).won;
+    if (prev && !this.levelRecord(prev.id).won) return false;
+    return this.starsMissing(level) === 0;
+  },
+
+  // Сколько звёзд не хватает, чтобы открыть главу этого боя (0 — хватает или бой не первый в главе)
+  starsMissing(level) {
+    if (!Levels.isChapterStart(level)) return 0;
+    return Math.max(0, Levels.chapters[level.chapter].stars - this.totalStars());
+  },
+
+  // Кампания пройдена — выигран последний бой
+  campaignDone() {
+    const last = Levels.last();
+    return !!last && this.levelRecord(last.id).won;
   },
 
   // Итог боя: звёзды копятся (каждая получена хоть раз — остаётся), записывается и сохраняется

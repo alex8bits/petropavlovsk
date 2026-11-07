@@ -88,12 +88,22 @@ const Render = {
     this.drawParticles(false);
     this.drawWater();
     this.drawParticles(true);
+    this.drawFog();
     this.drawHUD(game);
+  },
+
+  // Цвета берега по виду: песчаная коса, скала, глинистый обрыв, задернованный склон
+  groundColors: {
+    sand:  { soil: '#c9b07a', grass: '#6f9a4a', layer: 'rgba(120, 95, 60, 0.35)' },
+    rock:  { soil: '#8c8577', grass: '#5f7f45', layer: 'rgba(50, 45, 40, 0.4)' },
+    cliff: { soil: '#a8714a', grass: '#62873f', layer: 'rgba(80, 45, 25, 0.4)' },
+    grass: { soil: '#9c8a62', grass: '#5d8c3e', layer: 'rgba(80, 65, 40, 0.35)' },
   },
 
   drawGround() {
     const ctx = this.ctx, S = CFG.shore, W = CFG.water;
-    ctx.fillStyle = '#c9b07a';
+    const C = this.groundColors[S.kind] || this.groundColors.sand;
+    ctx.fillStyle = C.soil;
     ctx.beginPath();
     ctx.moveTo(this.X(-1), this.Y(S.topY));
     ctx.lineTo(this.X(S.edgeX), this.Y(S.topY));
@@ -104,10 +114,10 @@ const Render = {
     ctx.closePath();
     ctx.fill();
     // Трава
-    ctx.fillStyle = '#6f9a4a';
+    ctx.fillStyle = C.grass;
     ctx.fillRect(this.X(-1), this.Y(S.topY), this.X(S.edgeX - 0.3) - this.X(-1), 0.25 * this.s);
     // Слои грунта
-    ctx.strokeStyle = 'rgba(120, 95, 60, 0.35)';
+    ctx.strokeStyle = C.layer;
     ctx.lineWidth = 2;
     for (let y = S.topY - 1.2; y > W.seabedY; y -= 1.4) {
       ctx.beginPath();
@@ -344,12 +354,13 @@ const Render = {
 
     for (const b of sh.bricks) if (b.alive) this.drawBrick(b);
 
-    // Британский флаг на топе мачты: держится за верхний брусок и падает вместе с ним
+    // Флаг (британский или французский) на топе мачты: держится за верхний брусок и падает вместе с ним
     const top = sh.mastBricks[sh.mastBricks.length - 1];
     if (top && top.alive) {
       const k = sh.T.scale, ang = top.body.getAngle();
       const tp = top.body.getWorldPoint(V(top.w / 2, top.h / 2));
-      Flags.draw(this, 'uk', tp.x, tp.y, ang, 1.1 * k, 0.55 * k, sh.hull.getPosition().x);
+      const fw = sh.flag === 'uk' ? 1.1 : 0.85; // Юнион Джек 1:2, триколор 2:3
+      Flags.draw(this, sh.flag, tp.x, tp.y, ang, fw * k, 0.55 * k, sh.hull.getPosition().x);
     }
 
     // Пушки корабля (выбитая — обломок лафета, пока её чинят)
@@ -461,6 +472,19 @@ const Render = {
     }
   },
 
+  // Туман: у берега ясно, к горизонту всё плотнее (CFG.weather.fog — плотность вдали)
+  drawFog() {
+    const f = CFG.weather.fog;
+    if (!f) return;
+    const ctx = this.ctx;
+    const g = ctx.createLinearGradient(this.X(13), 0, this.X(CFG.world.width), 0);
+    g.addColorStop(0, 'rgba(215, 222, 226, 0)');
+    g.addColorStop(0.35, `rgba(215, 222, 226, ${0.45 * f})`);
+    g.addColorStop(1, `rgba(215, 222, 226, ${0.92 * f})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  },
+
   drawParticles(front) {
     const ctx = this.ctx, s = this.s;
     for (const p of Particles.list) {
@@ -549,7 +573,11 @@ const Render = {
     ctx.fillStyle = 'rgba(15, 25, 35, 0.72)';
     this.roundRect(rx, ry, rw, 120 * u, 8 * u); ctx.fill();
     ctx.fillStyle = '#fff';
-    ctx.fillText(`Потоплено: ${game.sunk} / ${CFG.fleet.length}`, rx + 12 * u, ry + 18 * u);
+    const left = game.surviveLeft();
+    const status = `Потоплено: ${game.sunk} / ${CFG.fleet.length}`;
+    const lt = Math.ceil(left || 0);
+    ctx.fillText(left === null ? status : `${status} · держаться ${Math.floor(lt / 60)}:${String(lt % 60).padStart(2, '0')}`,
+      rx + 12 * u, ry + 18 * u);
     const bar = (label, k, y, color) => {
       ctx.fillStyle = '#fff';
       ctx.fillText(label, rx + 12 * u, y);

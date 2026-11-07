@@ -16,10 +16,11 @@ const Entities = {
   },
 
   // ---------- Крепость ----------
+  // Размеры берутся из CFG.fortress (у каждой батареи своя кладка)
   createFortress(ground) {
-    const m = CFG.brick.stone, top = CFG.shore.topY;
+    const m = CFG.brick.stone, top = CFG.shore.topY, F = CFG.fortress;
     const rects = [];
-    const x0 = 0.6;
+    const x0 = F.x0;
     const addRow = (row, xFrom, cols, offset) => {
       const y = top + m.h / 2 + row * m.h;
       if (offset) {
@@ -30,25 +31,30 @@ const Entities = {
         for (let c = 0; c < cols; c++) rects.push({ x: xFrom + c * m.w + m.w / 2, y, w: m.w, h: m.h });
       }
     };
-    // Основная стена 7×9 с перевязкой
-    const wallRows = 9, wallCols = 7;
+    // Основная стена с перевязкой
+    const wallRows = F.wallRows, wallCols = F.wallCols;
     for (let r = 0; r < wallRows; r++) addRow(r, x0, wallCols, r % 2 === 1);
-    // Зубцы стены
+    // Зубцы стены (на чётных столбцах начиная со второго)
     for (let c = 2; c < wallCols; c += 2) {
       rects.push({ x: x0 + c * m.w + m.w / 2, y: top + m.h / 2 + wallRows * m.h, w: m.w, h: m.h });
     }
-    // Башня слева 2 кирпича шириной
-    const towerRows = 6;
-    for (let r = 0; r < towerRows; r++) addRow(wallRows + r, x0, 2, r % 2 === 1);
-    // Зубцы башни
-    rects.push({ x: x0 + m.w / 4, y: top + m.h / 2 + (wallRows + towerRows) * m.h, w: m.w / 2, h: m.h });
-    rects.push({ x: x0 + 2 * m.w - m.w / 4, y: top + m.h / 2 + (wallRows + towerRows) * m.h, w: m.w / 2, h: m.h });
+    // Башня слева
+    const towerRows = F.towerRows, towerCols = F.towerCols;
+    for (let r = 0; r < towerRows; r++) addRow(wallRows + r, x0, towerCols, r % 2 === 1);
+    if (towerRows > 0) {
+      // Зубцы башни
+      const ty = top + m.h / 2 + (wallRows + towerRows) * m.h;
+      rects.push({ x: x0 + m.w / 4, y: ty, w: m.w / 2, h: m.h });
+      rects.push({ x: x0 + towerCols * m.w - m.w / 4, y: ty, w: m.w / 2, h: m.h });
+    }
 
-    // Места для автоматических пушек: верх башни (между зубцами) и стена (между зубцами)
-    this.fortGunSpots = [
-      { x: x0 + m.w, y: top + (wallRows + towerRows) * m.h },
-      { x: x0 + 5.5 * m.w, y: top + wallRows * m.h },
-    ];
+    // Места для автоматических пушек: стена (в последнем промежутке между зубцами) и верх башни.
+    // CFG.fortGuns.count = 1 — только на стене.
+    let gap = wallCols - 1;
+    if (gap % 2 === 0) gap--;
+    this.fortGunSpots = [{ x: x0 + (gap + 0.5) * m.w, y: top + wallRows * m.h }];
+    if (towerRows > 0) this.fortGunSpots.push({ x: x0 + towerCols * m.w / 2, y: top + (wallRows + towerRows) * m.h });
+    this.fortGunSpots = this.fortGunSpots.slice(0, CFG.fortGuns.count);
 
     return Physics.buildBricks({
       rects, material: m, frame: null, anchorBody: ground,
@@ -94,7 +100,9 @@ const Entities = {
   },
 
   // ---------- Корабль ----------
-  createShip(typeKey, x, stopX) {
+  // opts — из записи эскадры в уровне: name (историческое имя), flag ('uk' | 'france'),
+  // speedMul, hpMul — множители скорости и прочности этого корабля, leaveAt — когда он уходит
+  createShip(typeKey, x, stopX, opts = {}) {
     const T = CFG.ships[typeKey], s = T.scale;
     const hw = 3.5 * s, bw = 2.6 * s, hh = 0.85 * s; // высокие борта — запас от заливания на обычной волне
     const y = CFG.water.level + 0.15;
@@ -123,7 +131,9 @@ const Entities = {
       // Трюм (внутренний контур корпуса) и вода в нём, м²
       hold: [{ x: -W(y1) + t, y: y1 }, { x: W(y1) - t, y: y1 }, { x: W(hh) - t, y: hh }, { x: -W(hh) + t, y: hh }],
       water: 0, waterPoly: null,
-      hp: T.hp, maxHp: T.hp, alive: true, deadTime: 0, stopX,
+      hp: T.hp * (opts.hpMul || 1), maxHp: T.hp * (opts.hpMul || 1), alive: true, deadTime: 0, stopX,
+      name: opts.name || T.name, flag: opts.flag || 'uk', speedMul: opts.speedMul || 1, retreat: false,
+      leaveAt: opts.leaveAt ?? null, // с от начала боя: тогда корабль уходит (не потопили — бой проигран)
       cannons: [], bricks: [], removed: false,
     };
     ship.holdArea = Physics.polyArea(ship.hold);
@@ -151,7 +161,8 @@ const Entities = {
     // Доски масштабируются вместе с кораблём
     const bw_ = m.w * s, bh_ = m.h * s;
     const deck = hh + bh_ / 2;
-    const cabinX0 = hw - 0.4 * s - T.cabinCols * bw_;
+    // Рубка — на корме; у учебного щита (cabinCenter) — посередине плота
+    const cabinX0 = T.cabinCenter ? -T.cabinCols * bw_ / 2 : hw - 0.4 * s - T.cabinCols * bw_;
     for (let r = 0; r < T.cabinRows; r++) {
       for (let c = 0; c < T.cabinCols; c++) rects.push({ x: cabinX0 + bw_ * (c + 0.5), y: deck + r * bh_, w: bw_, h: bh_, tag: 'cabin' });
     }
@@ -159,7 +170,7 @@ const Entities = {
     const mh = 0.6 * s;
     for (let r = 0; r < T.mastHeight; r++) rects.push({ x: T.mastX * s, y: hh + mh / 2 + r * mh, w: 0.22 * s, h: mh, tag: 'mast' });
     // Фальшборт у носовой пушки
-    rects.push({ x: Math.min(...T.cannons) * s - 0.75 * s, y: deck, w: 0.3 * s, h: bh_, tag: 'bulwark' });
+    if (T.cannons.length) rects.push({ x: Math.min(...T.cannons) * s - 0.75 * s, y: deck, w: 0.3 * s, h: bh_, tag: 'bulwark' });
 
     ship.bricks = Physics.buildBricks({
       rects, material: m, frame: hull, anchorBody: hull,

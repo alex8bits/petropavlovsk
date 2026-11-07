@@ -73,3 +73,50 @@ dt { color: var(--muted); }
 dd { margin: 0; }
 ul.conds { list-style: none; padding: 0; margin: 12px 0; }
 ul.conds li { margin: 4px 0; }
+
+/* Брифинг */
+.history { color: var(--muted); font-style: italic; border-left: 2px solid var(--powder); padding-left: 12px; }
+ul.fleet { list-style: none; padding: 0; margin: 0; }
+ul.fleet li { margin: 2px 0; }
+ul.fleet small { color: var(--muted); }
+.flag { display: inline-block; width: 18px; height: 11px; margin-right: 8px; vertical-align: -1px; border-radius: 1px; }
+.flag.uk { background: linear-gradient(90deg, transparent 40%, #fff 40% 60%, transparent 60%),
+  linear-gradient(transparent 35%, #fff 35% 65%, transparent 65%), #012169; position: relative; }
+.flag.uk::after { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 44%, #c8102e 44% 56%, transparent 56%),
+  linear-gradient(transparent 40%, #c8102e 40% 60%, transparent 60%); }
+.flag.fr { background: linear-gradient(90deg, #002395 33.3%, #fff 33.3% 66.6%, #ed2939 66.6%); }
+
+/* Карта кампании */
+.panel.campaign { width: min(1040px, 100%); }
+.campaign .head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.campaign .total { color: var(--muted); }
+.campaign-body { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.campaign .list { max-height: 62vh; overflow: auto; padding-right: 4px; }
+.campaign .list h3:first-child { margin-top: 0; }
+@media (max-width: 760px) { .campaign-body { grid-template-columns: 1fr; } .campaign .list { max-height: none; } }
+.gate { color: var(--lose); font: 13px system-ui, sans-serif; margin-left: 6px; }
+.win-note { color: var(--win); }
+.gate-note { color: var(--powder); }
+button.level.next { border-color: var(--powder); }
+
+svg.map { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid var(--line); }
+svg.map .sea { fill: #24506e; }
+svg.map .land { fill: #6f7f58; stroke: #c9b07a; stroke-width: 2; }
+svg.map .hill { fill: #5d6b49; }
+svg.map .lake { fill: #2e6384; }
+svg.map .geo { fill: rgba(242, 240, 234, 0.7); font: italic 12px Georgia, serif; }
+svg.map .geo.town { font-size: 14px; fill: var(--text); }
+svg.map .geo.bay { font-size: 18px; fill: rgba(242, 240, 234, 0.45); }
+svg.map .geo.note { font-size: 10px; fill: rgba(242, 240, 234, 0.4); }
+svg.map .ship-own rect { fill: #d9d4c4; }
+svg.map .squadron path { fill: #1a2630; stroke: rgba(255, 255, 255, 0.5); stroke-width: 1; }
+svg.map .bat circle { stroke: #0f1923; stroke-width: 2; }
+svg.map .bat text { fill: var(--text); font: 12px system-ui, sans-serif; paint-order: stroke; stroke: #0f1923; stroke-width: 3px; }
+svg.map .bat text.nums { fill: var(--muted); font-size: 11px; }
+svg.map .bat.locked circle { fill: #59606a; }
+svg.map .bat.open circle { fill: var(--powder); }
+svg.map .bat.done circle { fill: var(--win); }
+svg.map .bat.next circle { fill: var(--fire); }
+svg.map .bat .pulse { fill: none; stroke: var(--fire); stroke-width: 2; animation: pulse 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes pulse { from { opacity: 0.9; transform: scale(0.6); } to { opacity: 0; transform: scale(1.5); } }

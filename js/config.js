@@ -14,7 +14,14 @@ const BASE_CFG = {
     topY: 4,            // высота берега
     edgeX: 10.5,        // где кончается плоская часть берега
     slopeEndX: 14,      // где склон уходит в дно
+    kind: 'sand',       // вид берега для отрисовки: sand | rock | cliff | grass
   },
+
+  // Кладка крепости: стена wallCols × wallRows с зубцами и башня слева (towerRows = 0 — без башни)
+  fortress: { x0: 0.6, wallCols: 7, wallRows: 9, towerCols: 2, towerRows: 6 },
+
+  // Погода боя. fog — плотность тумана вдали (0 — ясно, 1 — дальних кораблей почти не видно)
+  weather: { fog: 0 },
 
   water: {
     level: 2.6,         // средний уровень воды
@@ -83,6 +90,7 @@ const BASE_CFG = {
   // Две автоматические пушки на крепости: на башне и на стене.
   // Стреляют сами по ближайшему кораблю; гибнут от попадания или если упадут вместе с кладкой.
   fortGuns: {
+    count: 2,           // сколько пушек на крепости (0–2): одна — на стене, вторая — на башне
     reloadMul: 1.4,     // перезарядка = перезарядка чугунного ядра игрока × reloadMul
     ball: 'light',      // калибр поменьше, чем у главной пушки
     aimError: 6,        // ошибка наводки, ±градусы (плюс обычный разброс ядра)
@@ -107,6 +115,12 @@ const BASE_CFG = {
       name: 'Фрегат', hp: 420, scale: 0.9, hullDensity: 1.2,
       speed: 0.6, fireDelay: [5.0, 7.0], aimError: 1.0,
       cannons: [-2.6, -0.3], mastX: 0.6, mastHeight: 7, cabinCols: 3, cabinRows: 3,
+    },
+    // Учебный щит: плот с дощатым щитом, без пушек и мачты; стоит на якоре
+    target: {
+      name: 'Учебный щит', hp: 120, scale: 0.55, hullDensity: 1.2,
+      speed: 1.6, fireDelay: [5, 5], aimError: 0,
+      cannons: [], mastX: 0, mastHeight: 0, cabinCols: 3, cabinRows: 3, cabinCenter: true,
     },
     // Задержка между прицеливанием и выстрелом: за это время корабль качнётся
     aimToFire: 0.7,

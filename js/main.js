@@ -47,6 +47,7 @@ const Game = {
     this.impacts = [];
     this.spawnIndex = 0;
     this.sunk = 0;
+    this.escaped = 0;      // кораблей, ушедших живыми (запись эскадры с leaveAt)
     this.endTimer = 0;
     this.endReported = false;
     this.shots = 0;        // выстрелов игрока
@@ -103,7 +104,13 @@ const Game = {
 
   onPreSolve(contact) {
     const bc = this.ballContact(contact);
-    if (!bc) return;
+    if (!bc) {
+      // Корабли проходят друг мимо друга (в глубине сцены они на разных линиях): разные корабли не сталкиваются
+      const sa = this.shipOf(contact.getFixtureA().getBody().getUserData());
+      const sb = this.shipOf(contact.getFixtureB().getBody().getUserData());
+      if (sa && sb && sa !== sb) contact.setEnabled(false);
+      return;
+    }
     const ud = bc.body.getUserData();
     if (this.ownHit(bc.ball, ud) || this.passesMast(bc.ball, ud)) contact.setEnabled(false);
   },
@@ -449,7 +456,7 @@ const Game = {
     const lvl = CFG.fleet;
     while (this.spawnIndex < lvl.length && this.time >= lvl[this.spawnIndex].t) {
       const e = lvl[this.spawnIndex++];
-      this.ships.push(Entities.createShip(e.type, CFG.world.width + 6, e.stopX));
+      this.ships.push(Entities.createShip(e.type, CFG.world.width + 6, e.stopX, e));
     }
 
     // Пушка игрока
@@ -493,12 +500,19 @@ const Game = {
       if (s.alive && sub > 0) {
         const v = s.hull.getLinearVelocity();
         const x = s.hull.getPosition().x;
-        const speed = s.T.speed * (s.mastBroken ? CFG.ships.mastBrokenSpeed : 1);
-        const targetV = x > s.stopX ? -speed : 0;
+        const speed = s.T.speed * s.speedMul * (s.mastBroken ? CFG.ships.mastBrokenSpeed : 1);
+        // После боя на удержание уцелевшие корабли уходят из губы
+        const targetV = s.retreat ? speed : x > s.stopX ? -speed : 0;
         // Тяга: компенсируем сопротивление воды на целевой скорости + подруливаем к ней
         const dragAtTarget = targetV * CFG.water.dragX * sub * CFG.water.density;
         s.hull.applyForceToCenter(V((targetV - v.x) * s.hull.getMass() * 3 + dragAtTarget, 0), true);
         if (this.state === 'play') this.shipAI(s, dt);
+      }
+      // Время корабля вышло (leaveAt) — разворачивается и уходит
+      if (s.alive && s.leaveAt !== null && this.time >= s.leaveAt && this.state === 'play') s.retreat = true;
+      if (s.retreat && s.alive && s.hull.getPosition().x > CFG.world.width + 8) {
+        if (this.state === 'play') this.escaped++;
+        this.removeShip(s);
       }
       if (!s.alive && (s.deadTime > 14 || s.hull.getPosition().y < CFG.water.seabedY + 0.5 && s.deadTime > 6)) {
         this.removeShip(s);
@@ -635,9 +649,24 @@ const Game = {
   checkEnd() {
     if (this.state !== 'play') return;
     if (this.fortressIntegrity() < CFG.lose.fortressMinIntegrity) { this.state = 'lose'; this.message = 'Крепость разрушена'; return; }
-    if (CFG.win === 'sinkAll' && this.spawnIndex >= CFG.fleet.length && this.sunk >= CFG.fleet.length) {
-      this.state = 'win'; this.message = 'Все корабли потоплены!';
+    if (this.escaped > 0 && this.spawnIndex >= CFG.fleet.length && this.sunk + this.escaped >= CFG.fleet.length) {
+      this.state = 'lose'; this.message = this.escaped > 1 ? 'Корабли ушли' : 'Корабль ушёл';
+      return;
     }
+    if (this.spawnIndex >= CFG.fleet.length && this.sunk >= CFG.fleet.length) {
+      this.state = 'win'; this.message = 'Все корабли потоплены!';
+      return;
+    }
+    // Бой на удержание: батарея продержалась до отхода эскадры
+    if (CFG.win.type === 'survive' && this.time >= CFG.win.time) {
+      this.state = 'win'; this.message = 'Батарея выстояла — эскадра отходит';
+      for (const s of this.ships) if (s.alive) s.retreat = true;
+    }
+  },
+
+  // Сколько секунд осталось продержаться (только в бою на удержание), иначе null
+  surviveLeft() {
+    return CFG.win.type === 'survive' ? Math.max(0, CFG.win.time - this.time) : null;
   },
 
   // Итоги боя и звёзды: 1 — победа, 2 — крепость цела больше чем на stars.fortress,
