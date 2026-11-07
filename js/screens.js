@@ -286,6 +286,11 @@ const Screens = {
           <dt>Esc</dt><dd>пауза</dd>
           <dt>M</dt><dd>звук вкл/выкл</dd>
         </dl>
+        <h3>Звуки</h3>
+        <p class="credits">Записи с <a href="https://freesound.org" target="_blank" rel="noopener">Freesound</a>:
+          выстрел пушки — man (CC BY 4.0), удар о дерево — Srehpog (CC BY 3.0);
+          qubodup, craigsmith и Kinoton — CC0.
+          Остальное синтезировано.</p>
         <div class="row"><button class="primary" data-act="back">Готово</button></div>
       </div>`;
   },

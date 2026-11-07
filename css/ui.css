@@ -166,3 +166,5 @@ button.switch { min-width: 64px; padding: 6px 12px; }
 button.switch.on { background: var(--powder); border-color: var(--powder); color: #2a1c0c; }
 .settings input[type=range] { width: 180px; accent-color: var(--powder); }
 .settings dl.keys { grid-template-columns: max-content 1fr; font-size: 14px; }
+.settings .credits { color: var(--muted); font-size: 13px; line-height: 1.4; margin: 0; }
+.settings .credits a { color: inherit; }
