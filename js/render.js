@@ -2,9 +2,13 @@
 
 const Render = {
   canvas: null, ctx: null, s: 30, ox: 0, buttons: [], clouds: [],
+  // Шрифты канваса — те же, что в css/ui.css (грузятся с Google Fonts)
+  FONT: "'PT Serif', Georgia, serif", TITLE: "'Old Standard TT', Georgia, serif",
 
   init(canvas) {
     Flags.init();
+    // Канвас сам шрифты не подгружает: просим заранее, чтобы интерфейс боя не мигал запасным
+    if (document.fonts) [`14px ${this.FONT}`, `bold 48px ${this.TITLE}`].forEach(f => document.fonts.load(f).catch(() => {}));
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     const resize = () => {
@@ -629,7 +633,7 @@ const Render = {
     const ctx = this.ctx, d = this.dpr, c = game.cannon;
     const u = this.s / 30; // базовая единица интерфейса
     this.buttons = [];
-    ctx.font = `${14 * u}px system-ui, sans-serif`;
+    ctx.font = `${13 * u}px ${this.FONT}`;
     ctx.textBaseline = 'middle';
 
     // Левая панель: пушка
@@ -652,7 +656,7 @@ const Render = {
     const PS = CFG.powderStore;
     const enough = game.canAffordShot();
     ctx.fillStyle = enough ? '#fff' : '#ff8a7a';
-    ctx.fillText(`Склад: ${game.powder} / ${PS.capacity} меш.`, px + 110 * u, py + 18 * u);
+    ctx.fillText(`Склад: ${game.powder} / ${PS.capacity} меш.`, px + 104 * u, py + 18 * u);
     if (game.powder < PS.capacity) {
       const k = game.powderTimer / PS.resupplyEvery;
       ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(px + 240 * u, py + 14 * u, 48 * u, 8 * u);
@@ -696,12 +700,12 @@ const Render = {
     ctx.textAlign = 'left';
     this.buttons.push({ ...fb, fn: () => game.playerFire() });
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = `${11 * u}px system-ui, sans-serif`;
+    ctx.font = `${11 * u}px ${this.FONT}`;
     ctx.fillText('↑↓ / колесо — угол · ←→ — порох', px + 12 * u, py + 113 * u);
     ctx.fillText('Пробел — выстрел · Q — ядро · Esc — пауза', px + 12 * u, py + 129 * u);
 
     // Правая панель: состояние
-    ctx.font = `${14 * u}px system-ui, sans-serif`;
+    ctx.font = `${13 * u}px ${this.FONT}`;
     ctx.fillStyle = 'rgba(15, 25, 35, 0.72)';
     this.roundRect(rx, ry, rw, 120 * u, 8 * u); ctx.fill();
     ctx.fillStyle = '#fff';
@@ -738,10 +742,10 @@ const Render = {
       ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       ctx.textAlign = 'center';
       ctx.fillStyle = game.state === 'win' ? '#9be37f' : '#ff7b6b';
-      ctx.font = `bold ${48 * u}px system-ui, sans-serif`;
+      ctx.font = `bold ${48 * u}px ${this.TITLE}`;
       ctx.fillText(game.state === 'win' ? 'Победа' : 'Поражение', this.canvas.width / 2, this.canvas.height / 2 - 30 * u);
       ctx.fillStyle = '#fff';
-      ctx.font = `${20 * u}px system-ui, sans-serif`;
+      ctx.font = `${20 * u}px ${this.FONT}`;
       ctx.fillText(game.message, this.canvas.width / 2, this.canvas.height / 2 + 20 * u);
       ctx.textAlign = 'left';
     }
@@ -768,7 +772,7 @@ const Render = {
     }
     // Плашка: в промежутке между левой и правой панелями
     const left = 324 * u, right = W - 274 * u, bw = Math.min(560 * u, right - left), bx = (left + right - bw) / 2, by = 12 * u;
-    ctx.font = `${15 * u}px system-ui, sans-serif`;
+    ctx.font = `${15 * u}px ${this.FONT}`;
     const lines = this.wrap(h.text, bw - 28 * u);
     const bh = 34 * u + lines.length * 21 * u;
     ctx.fillStyle = 'rgba(15, 25, 35, 0.86)';
@@ -777,10 +781,10 @@ const Render = {
     this.roundRect(bx, by, bw, bh, 8 * u); ctx.stroke();
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#c99a52';
-    ctx.font = `${12 * u}px system-ui, sans-serif`;
+    ctx.font = `${12 * u}px ${this.FONT}`;
     ctx.fillText(`Подсказка ${h.n} из ${h.total}`, bx + 14 * u, by + 15 * u);
     ctx.fillStyle = '#fff';
-    ctx.font = `${15 * u}px system-ui, sans-serif`;
+    ctx.font = `${15 * u}px ${this.FONT}`;
     lines.forEach((l, i) => ctx.fillText(l, bx + 14 * u, by + 37 * u + i * 21 * u));
     ctx.restore();
   },

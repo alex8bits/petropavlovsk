@@ -8,6 +8,9 @@
   --fire: #c0392b;
   --win: #9be37f;
   --lose: #ff7b6b;
+  /* Шрифты: Old Standard TT — по мотивам русских наборных шрифтов XIX в., PT Serif — текст и интерфейс */
+  --font-title: 'Old Standard TT', Georgia, serif;
+  --font-text: 'PT Serif', Georgia, serif;
 }
 
 #ui {
@@ -15,7 +18,7 @@
   display: flex; align-items: center; justify-content: center;
   padding: 16px; box-sizing: border-box;
   background: rgba(8, 14, 20, 0.35);
-  font: 16px/1.45 system-ui, sans-serif; color: var(--text);
+  font: 16px/1.45 var(--font-text); color: var(--text);
   overflow: auto;
 }
 #ui.dim { background: rgba(0, 0, 0, 0.5); }
@@ -30,7 +33,7 @@
 .panel.wide { width: min(560px, 100%); }
 .panel.menu { text-align: center; padding: 36px 32px; }
 
-h1, h2, h3 { font-family: Georgia, 'Times New Roman', serif; font-weight: normal; margin: 0 0 8px; }
+h1, h2, h3 { font-family: var(--font-title); font-weight: normal; margin: 0 0 8px; }
 h1 { font-size: 40px; letter-spacing: 0.02em; }
 h2 { font-size: 28px; }
 h2.win { color: var(--win); }
@@ -58,7 +61,7 @@ button.danger { border-color: var(--lose); color: var(--lose); }
 
 .levels { display: flex; flex-direction: column; gap: 8px; }
 button.level { display: flex; align-items: center; gap: 14px; text-align: left; padding: 10px 14px; }
-button.level .num { font: 22px Georgia, serif; color: var(--powder); width: 24px; text-align: center; }
+button.level .num { font: 22px var(--font-title); color: var(--powder); width: 24px; text-align: center; }
 button.level .info { flex: 1; display: flex; flex-direction: column; }
 button.level small { color: var(--muted); }
 button.level .lock { color: var(--muted); font-size: 14px; }
@@ -95,7 +98,7 @@ ul.fleet small { color: var(--muted); }
 .campaign .list { max-height: 62vh; overflow: auto; padding-right: 4px; }
 .campaign .list h3:first-child { margin-top: 0; }
 @media (max-width: 760px) { .campaign-body { grid-template-columns: 1fr; } .campaign .list { max-height: none; } }
-.gate { color: var(--lose); font: 13px system-ui, sans-serif; margin-left: 6px; }
+.gate { color: var(--lose); font: 13px var(--font-text); margin-left: 6px; }
 .win-note { color: var(--win); }
 .gate-note { color: var(--powder); }
 button.level.next { border-color: var(--powder); }
@@ -105,14 +108,14 @@ svg.map .sea { fill: #24506e; }
 svg.map .land { fill: #6f7f58; stroke: #c9b07a; stroke-width: 2; }
 svg.map .hill { fill: #5d6b49; }
 svg.map .lake { fill: #2e6384; }
-svg.map .geo { fill: rgba(242, 240, 234, 0.7); font: italic 12px Georgia, serif; }
+svg.map .geo { fill: rgba(242, 240, 234, 0.7); font: italic 13px var(--font-title); }
 svg.map .geo.town { font-size: 14px; fill: var(--text); }
 svg.map .geo.bay { font-size: 18px; fill: rgba(242, 240, 234, 0.45); }
 svg.map .geo.note { font-size: 10px; fill: rgba(242, 240, 234, 0.4); }
 svg.map .ship-own rect { fill: #d9d4c4; }
 svg.map .squadron path { fill: #1a2630; stroke: rgba(255, 255, 255, 0.5); stroke-width: 1; }
 svg.map .bat circle { stroke: #0f1923; stroke-width: 2; }
-svg.map .bat text { fill: var(--text); font: 12px system-ui, sans-serif; paint-order: stroke; stroke: #0f1923; stroke-width: 3px; }
+svg.map .bat text { fill: var(--text); font: 12px var(--font-text); paint-order: stroke; stroke: #0f1923; stroke-width: 3px; }
 svg.map .bat text.nums { fill: var(--muted); font-size: 11px; }
 svg.map .bat.locked circle { fill: #59606a; }
 svg.map .bat.open circle { fill: var(--powder); }
