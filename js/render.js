@@ -288,7 +288,7 @@ const Render = {
     ctx.beginPath(); ctx.moveTo(this.X(F.x), this.Y(CFG.shore.topY)); ctx.lineTo(this.X(F.x), this.Y(F.top)); ctx.stroke();
     ctx.fillStyle = '#c8a24a';
     ctx.beginPath(); ctx.arc(this.X(F.x), this.Y(F.top + 0.1), 0.13 * s, 0, Math.PI * 2); ctx.fill();
-    Flags.draw(this, 'russia', F.x + 0.06, F.top - 0.1, 0, F.flagW, F.flagW * 2 / 3, 0);
+    Flags.draw(this, 'andrew', F.x + 0.06, F.top - 0.1, 0, F.flagW, F.flagW * 2 / 3, 0);
   },
 
   drawFortGun(g) {
@@ -305,6 +305,59 @@ const Render = {
     ctx.fillStyle = '#3d2a18';
     for (const dx of [-0.2, 0.2]) {
       ctx.beginPath(); ctx.arc(dx * s, g.hh * 0.6 * s, 0.13 * s, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  // Труба парохода над колесом (только рисунок, ядра её не задевают)
+  drawFunnel(sh) {
+    const ctx = this.ctx, s = this.s, F = sh.T.funnel, k = sh.T.scale;
+    const p = sh.hull.getPosition(), a = sh.hull.getAngle();
+    ctx.save();
+    ctx.translate(this.X(p.x), this.Y(p.y));
+    ctx.rotate(-a);
+    const x = F.x * k * s, w = F.w * k * s, y0 = -sh.hh * s, h = F.h * k * s;
+    ctx.fillStyle = sh.alive ? '#2a2a2c' : '#1c1c1d';
+    ctx.fillRect(x - w / 2, y0 - h, w, h);
+    ctx.fillStyle = '#8a2a20'; // красный поясок у верха
+    ctx.fillRect(x - w / 2, y0 - h + 0.12 * k * s, w, 0.14 * k * s);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(x - w * 0.6, y0 - h, w * 1.2, 0.08 * k * s);
+    ctx.restore();
+  },
+
+  // Гребное колесо в полукруглом кожухе; разбитое — без кожуха, с обломанными плицами
+  drawWheel(sh) {
+    const ctx = this.ctx, s = this.s, w = sh.wheel;
+    const c = sh.hull.getWorldPoint(V(w.local.x, w.local.y)), a = sh.hull.getAngle();
+    const r = w.r * s;
+    ctx.save();
+    ctx.translate(this.X(c.x), this.Y(c.y));
+    ctx.rotate(-a);
+    ctx.lineWidth = Math.max(1, 0.05 * s);
+    ctx.strokeStyle = w.alive ? '#3b2412' : '#24170c';
+    // Обод и спицы с плицами
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.92, 0, Math.PI * 2); ctx.stroke();
+    const n = 10;
+    for (let i = 0; i < n; i++) {
+      if (!w.alive && i % 3 !== 0) continue; // у разбитого колеса уцелели лишь несколько плиц
+      const ang = w.angle + i * Math.PI * 2 / n; // идёт влево — вращается против часовой
+      const cx = Math.cos(ang), cy = Math.sin(ang);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(cx * r, cy * r); ctx.stroke();
+      ctx.save(); ctx.translate(cx * r * 0.85, cy * r * 0.85); ctx.rotate(ang);
+      ctx.fillStyle = w.alive ? '#5a3a1f' : '#33220f';
+      ctx.fillRect(-r * 0.15, -r * 0.08, r * 0.3, r * 0.16);
+      ctx.restore();
+    }
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(0, 0, r * 0.12, 0, Math.PI * 2); ctx.fill();
+    // Кожух над колесом: пока цел; повреждённый темнеет
+    if (w.alive) {
+      const dmg = 1 - w.hp / w.maxHp;
+      ctx.fillStyle = `rgb(${120 - dmg * 50 | 0},${84 - dmg * 35 | 0},${48 - dmg * 20 | 0})`;
+      ctx.beginPath(); ctx.arc(0, 0, r * 1.08, Math.PI, 0); ctx.lineTo(r * 1.08, 0); ctx.lineTo(r * 0.95, 0);
+      ctx.arc(0, 0, r * 0.95, 0, Math.PI, true); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#c8a24a';
+      ctx.fillRect(-r * 1.08, -r * 0.04, r * 2.16, r * 0.08);
     }
     ctx.restore();
   },
@@ -389,7 +442,9 @@ const Render = {
       }
     }
 
+    if (sh.T.funnel) this.drawFunnel(sh);
     for (const b of sh.bricks) if (b.alive) this.drawBrick(b);
+    if (sh.wheel) this.drawWheel(sh);
 
     // Флаг (британский или французский) на топе мачты: держится за верхний брусок и падает вместе с ним
     const top = sh.mastBricks[sh.mastBricks.length - 1];

@@ -175,6 +175,15 @@ const Entities = {
       ship.cannons.push(gun);
     });
 
+    // Гребное колесо (пароход): свой фикстур на борту, как у пушки, — по нему ловим попадания
+    if (T.wheel) {
+      ship.wheel = { kind: 'wheel', ship, alive: true, hp: CFG.ships.wheelHp, maxHp: CFG.ships.wheelHp,
+        local: { x: T.wheel.x * s, y: hh - 0.1 * s }, r: T.wheel.r * s, angle: 0 };
+      ship.wheel.fixture = hull.createFixture(new pl.Circle(V(ship.wheel.local.x, ship.wheel.local.y), ship.wheel.r), {
+        density: 0.5, friction: 0.6, userData: ship.wheel,
+      });
+    }
+
     // Надстройка из досок на корме (справа, корабль плывёт влево)
     const m = CFG.brick.wood;
     const rects = [];

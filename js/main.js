@@ -144,7 +144,7 @@ const Game = {
       const { ball, target, x, y } = imp;
       // Точность игрока: ядро его пушки задело корабль (считается один раз на ядро)
       if (ball.owner === 'player' && !ball.fromFort && !ball.scored &&
-          (target.kind === 'shipGun' || this.shipOf(target))) { ball.scored = true; this.hits++; }
+          (target.kind === 'shipGun' || target.kind === 'wheel' || this.shipOf(target))) { ball.scored = true; this.hits++; }
       // Вражеские ядра бьют по кладке сильнее на CFG.ships.shellPower (по пушке — как раньше)
       const boost = ball.owner !== 'player' && target.kind === 'brick';
       const energy = boost ? imp.energy * CFG.ships.shellPower : imp.energy;
@@ -158,6 +158,11 @@ const Game = {
         target.hp -= energy * CFG.ships.gunDamagePerJoule * ball.B.damage;
         Particles.debris(x, y, [70, 70, 70], 6);
         if (target.hp <= 0) this.destroyShipGun(target, x, y);
+      } else if (target.kind === 'wheel' && target.alive && target.ship.alive && !ball.hitGun) {
+        ball.hitGun = true; // одно ядро — одна пушка или колесо
+        target.hp -= energy * CFG.ships.gunDamagePerJoule * ball.B.damage;
+        Particles.debris(x, y, CFG.brick.wood.color, 8);
+        if (target.hp <= 0) this.breakWheel(target, x, y);
       } else if (target.kind === 'hull' && target.alive) {
         target.hp -= energy * CFG.ships.damagePerJoule * ball.B.hullDamage;
         this.shockwave(x, y, energy * 0.7);
@@ -167,7 +172,7 @@ const Game = {
         this.destroyFortGun(target);
       } else if (target.kind === 'cannon' && target.owner === 'player' && ball.owner !== 'player') {
         if (target.repair <= 0) {
-          target.hp -= energy * 0.08;
+          target.hp -= energy * 0.106; // 0,08 × 1,32 (см. powderSpeed)
           if (target.hp <= 0) this.breakPlayerCannon(target);
         }
         Particles.debris(x, y, [80, 80, 80], 10);
@@ -262,6 +267,31 @@ const Game = {
     gun.repair = gun.repairTotal;
     Particles.debris(x, y, [60, 60, 60], 14);
     Particles.smoke(x, y, 0, 1, 6);
+  },
+
+  // Колесо разбито навсегда: больше не ловит ядра, пароход теряет треть хода
+  breakWheel(wheel, x, y) {
+    wheel.alive = false;
+    wheel.fixture.setSensor(true);
+    Particles.debris(x, y, CFG.brick.wood.color, 16);
+    Particles.smoke(x, y, 0, 1, 10);
+  },
+
+  // Колесо крутится по ходу корабля, из трубы идёт дым (пока колесо цело — машина работает)
+  steamerEffects(s, dt) {
+    const w = s.wheel, T = s.T;
+    if (w.alive) w.angle += s.hull.getLinearVelocity().x / w.r * dt;
+    if (!w.alive || Math.random() > dt * 5) return;
+    const k = T.scale, top = s.hull.getWorldPoint(V(T.funnel.x * k, s.hh + T.funnel.h * k));
+    Particles.spawn({ type: 'smoke', x: top.x, y: top.y, vx: 0.6 + Math.random() * 0.4, vy: 0.8 + Math.random() * 0.5,
+      g: 0.2, size: 0.15 + Math.random() * 0.15, life: 1.6 + Math.random(), max: 2.6, color: [105, 102, 98] });
+  },
+
+  // Доля скорости корабля с учётом повреждений движителей
+  speedFactor(s) {
+    if (!s.wheel) return s.mastBroken ? CFG.ships.mastBrokenSpeed : 1;
+    const lost = (s.mastBroken ? 1 : 0) + (s.wheel.alive ? 0 : 1);
+    return 1 - lost * CFG.ships.propulsionLoss;
   },
 
   // Время перезарядки корабельной пушки — середина интервала fireDelay
@@ -533,12 +563,13 @@ const Game = {
         mul = 0.85 + 0.15 * (s.hp / s.maxHp); // пробоины — корабль садится ниже
       }
       if (s.alive) this.updateShipDamage(s);
+      if (s.alive && s.wheel) this.steamerEffects(s, dt);
       const sub = Physics.applyBuoyancyPoints(s.hull, s.points, s.cellH, mul);
       this.updateFlooding(s, dt);
       if (s.alive && sub > 0) {
         const v = s.hull.getLinearVelocity();
         const x = s.hull.getPosition().x;
-        const speed = s.T.speed * s.speedMul * (s.mastBroken ? CFG.ships.mastBrokenSpeed : 1);
+        const speed = s.T.speed * s.speedMul * this.speedFactor(s);
         // После боя на удержание уцелевшие корабли уходят из губы
         const targetV = s.retreat ? speed : x > s.stopX ? -speed : 0;
         // Тяга: компенсируем сопротивление воды на целевой скорости + подруливаем к ней

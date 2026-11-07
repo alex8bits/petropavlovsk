@@ -1,8 +1,9 @@
 // Флаги. Рисунок взят по эталонам с Викимедиа (Commons), чтобы не было отсебятины:
 //  • Великобритания — «Flag of the United Kingdom (1-2).svg»: Юнион Джек образца 1801 г.
 //    (действовал и в 1854 г.), пропорции 1:2, косой красный крест св. Патрика смещён.
-//  • Российская империя — «Flag of Russia.svg»: бело-сине-красный, пропорции 2:3.
-//    В 1854 г. это фактический национальный флаг; чёрно-жёлто-белый утвердили только в 1858 г.
+//  • Россия — Андреевский флаг, «Naval Ensign of Russia.svg»: белое полотнище с синим косым
+//    крестом из угла в угол, пропорции 2:3, ширина креста — 1/10 длины флага. Кормовой флаг
+//    военного флота; Петропавловск обороняли моряки «Авроры» и «Двины».
 //  • Франция — «Flag of France (1794–1815, 1830–1958).svg»: триколор образца Второй империи,
 //    вертикальные синяя, белая и красная полосы равной ширины, пропорции 2:3.
 // Каждый флаг один раз рисуется в отдельный холст, а в игре выводится полосками с волной.
@@ -25,11 +26,12 @@ const Flags = {
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 10; ctx.stroke(cross);
       ctx.strokeStyle = '#C8102E'; ctx.lineWidth = 6; ctx.stroke(cross);
     });
-    this.images.russia = this.make(900, 600, ctx => {
+    this.images.andrew = this.make(900, 600, ctx => {
       ctx.scale(100, 100); // viewBox 0 0 9 6
-      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 9, 3);
-      ctx.fillStyle = '#d52b1e'; ctx.fillRect(0, 3, 9, 3);
-      ctx.fillStyle = '#0039a6'; ctx.fillRect(0, 2, 9, 2);
+      ctx.beginPath(); ctx.rect(0, 0, 9, 6); ctx.clip();
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 9, 6);
+      ctx.strokeStyle = '#0033a0'; ctx.lineWidth = 0.9;
+      ctx.stroke(new Path2D('M0,0 L9,6 M9,0 L0,6'));
     });
     this.images.france = this.make(900, 600, ctx => {
       ctx.scale(100, 100); // viewBox 0 0 9 6

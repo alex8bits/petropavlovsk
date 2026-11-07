@@ -16,7 +16,7 @@ Levels.add({
   },
 
   fleet: [
-    { t: 1,  type: 'sloop',   stopX: 30, name: 'Virago' },
+    { t: 1,  type: 'steamer', stopX: 30, name: 'Virago' },
     { t: 16, type: 'sloop',   stopX: 35, name: 'Obligado', flag: 'france' },
     { t: 32, type: 'frigate', stopX: 27, name: 'Pique' },
     { t: 50, type: 'sloop',   stopX: 38, name: 'Eurydice', flag: 'france', hpMul: 1.2 },
