@@ -23,6 +23,7 @@ const Game = {
     this.reset();
     this.active = true;
     this.paused = false;
+    Tutorial.start(level);
   },
 
   // Уничтожить бой целиком: ничего не переходит в следующий
@@ -36,6 +37,7 @@ const Game = {
     this.ground = null; this.cannon = null; this.rampart = null; this.ammo = {};
     this.fortress = []; this.fortGuns = []; this.ships = []; this.balls = []; this.impacts = [];
     this.keys = {};
+    Tutorial.stop();
   },
 
   reset() {
@@ -153,6 +155,7 @@ const Game = {
         const ship = this.shipOf(target) || target.ship;
         if (ship && ship.alive) { ball.ignited = true; this.ignite(ship, x, y, CFG.fire.ignite * ball.heat); }
       }
+      this.impactSound(target, x, energy);
       if (target.kind === 'brick' && target.alive) {
         this.damageBrick(target, energy * CFG.brick.damagePerJoule * ball.B.damage);
         this.shockwave(x, y, energy);
@@ -192,6 +195,17 @@ const Game = {
     this.impacts.length = 0;
   },
 
+  // Звук удара: по материалу цели, громкость — от энергии (≈ 400 Дж — полный заряд чугунным)
+  impactSound(target, x, energy) {
+    const k = target.kind, power = Math.sqrt(energy / 400);
+    if (power < 0.15) return; // ядро катается по трюму или палубе — не стучим
+    const name = k === 'brick' ? (target.owner === 'fortress' ? 'stone' : 'wood')
+      : k === 'hull' || k === 'wheel' ? 'wood'
+      : k === 'shipGun' || k === 'cannon' || k === 'fortGun' ? 'metal'
+      : k === 'ground' || k === 'rampart' ? 'earth' : null;
+    if (name) Sound.event(name, { x, power });
+  },
+
   // ---------- Пушки крепости ----------
   destroyFortGun(gun) {
     if (!gun.alive) return;
@@ -222,6 +236,7 @@ const Game = {
       const L = F.barrelLength;
       const ball = this.fireBall('player', F.ball, pv.x + Math.cos(ang) * L, pv.y + Math.sin(ang) * L, ang, gun.aimPending.powder);
       ball.fromFort = true;
+      Sound.event('fortShot', { x: pv.x, power: 0.8 });
       gun.recoil = 1;
       gun.aimPending = null;
       gun.reload = F.reload;
@@ -278,6 +293,7 @@ const Game = {
   breakWheel(wheel, x, y) {
     wheel.alive = false;
     wheel.fixture.setSensor(true);
+    Sound.event('crash', { x, power: 0.9 });
     Particles.debris(x, y, CFG.brick.wood.color, 16);
     Particles.smoke(x, y, 0, 1, 10);
   },
@@ -301,7 +317,10 @@ const Game = {
     let near = null, best = Infinity;
     for (const f of ship.fires) { const d = Math.hypot(f.x - p.x, f.y - p.y); if (d < best) { best = d; near = f; } }
     if (near && (best < 1 || ship.fires.length >= F.maxFires)) near.power = Math.min(1, near.power + power);
-    else ship.fires.push({ x: p.x, y: p.y, power: Math.min(1, power) });
+    else {
+      ship.fires.push({ x: p.x, y: p.y, power: Math.min(1, power) });
+      Sound.event('ignite', { x, power: 0.8 });
+    }
   },
 
   // Огонь растёт, команда тушит; горят корпус и доски рядом. Под водой очаг гаснет.
@@ -411,6 +430,7 @@ const Game = {
     ship.deadTime = 0;
     this.sunk++;
     this.sunkTypes[ship.type] = (this.sunkTypes[ship.type] || 0) + 1;
+    Sound.event('sink', { x: ship.hull.getPosition().x });
     // Надстройка разваливается
     for (const br of ship.bricks) for (const j of [...br.joints]) if (Math.random() < 0.5) Physics.breakJoint(j);
   },
@@ -468,7 +488,7 @@ const Game = {
   playerFire() {
     const c = this.cannon;
     if (this.state !== 'play' || c.reload > 0 || c.hp <= 0) return;
-    if (!this.canAffordShot()) return; // мало пороха — не стреляем, заряд не урезаем
+    if (!this.canAffordShot()) { Sound.event('empty'); return; } // мало пороха — не стреляем, заряд не урезаем
     if (this.ammoLeft(c.ballType) <= 0) c.ballType = 'iron';
     this.powder -= c.powder;
     this.powderSpent += c.powder;
@@ -477,6 +497,7 @@ const Game = {
     const L = CFG.playerCannon.barrelLength;
     const type = c.ballType;
     this.fireBall('player', type, c.pivot.x + Math.cos(a) * L, c.pivot.y + Math.sin(a) * L, a, c.powder, this.playerAccuracy());
+    Sound.event('shot', { x: c.pivot.x, power: c.powder / MAX_POWDER });
     if (type !== 'iron') {
       this.ammo[type]--;
       if (this.ammo[type] <= 0) c.ballType = 'iron'; // кончились — дальше чугунными
@@ -526,6 +547,7 @@ const Game = {
         const a = cw.angle + err;
         const L = 1.0 * T.scale;
         this.fireBall(ship, 'iron', cw.x + Math.cos(a) * L, cw.y + Math.sin(a) * L, a, gun.aimPending.powder);
+        Sound.event('enemyShot', { x: cw.x, power: 0.6 + 0.4 * gun.aimPending.powder / MAX_POWDER });
         gun.recoil = 1;
         gun.aimPending = null;
         gun.fireTimer = T.fireDelay[0] + Math.random() * (T.fireDelay[1] - T.fireDelay[0]);
@@ -587,7 +609,7 @@ const Game = {
       c.repair -= dt;
       if (Math.random() < dt * 5) Particles.spawn({ type: 'spark', x: c.pivot.x + (Math.random() - 0.5) * 0.8, y: c.pivot.y,
         vx: (Math.random() - 0.5) * 2, vy: 1 + Math.random() * 2, g: -9.8, size: 0.06, life: 0.3, max: 0.3, color: [255, 210, 120] });
-      if (c.repair <= 0) { c.repair = 0; c.hp = c.maxHp; }
+      if (c.repair <= 0) { c.repair = 0; c.hp = c.maxHp; Sound.event('repaired'); }
     }
 
     // Подвоз пороха: 1 мешок раз в resupplyEvery секунд, пока склад не полон
@@ -663,6 +685,7 @@ const Game = {
         if (!b.wasWet) b.hits += 2; // в воде ядро теряет силу
         b.wasWet = true;
         Particles.splash(p.x, surf, Math.abs(v.y));
+        Sound.event('splash', { x: p.x, power: Math.abs(v.y) / 14 });
         if (b.heat > 0) { b.heat = 0; Particles.smoke(p.x, surf, 0, 1, 5); } // калёное шипит и гаснет
       }
       if (b.heat > 0) {
@@ -685,6 +708,8 @@ const Game = {
     this.processImpacts();
     Particles.update(dt);
     this.checkEnd();
+    Tutorial.update(this, dt);
+    if (this.state !== 'play' && this.endTimer === 0) Sound.event(this.state);
     if (this.state !== 'play' && !this.endReported) {
       this.endTimer += dt;
       if (this.endTimer >= this.endDelay) {
@@ -704,7 +729,10 @@ const Game = {
   // Мачта ломается навсегда, если уничтожен хоть один брусок или порвано хоть одно крепление
   // (по смещению не смотрим: высокая мачта пружинит на волне). Команда — по доскам рубки.
   updateShipDamage(s) {
-    if (!s.mastBroken && s.mastBricks.some(b => !b.alive || b.joints.size < b.initJoints)) s.mastBroken = true;
+    if (!s.mastBroken && s.mastBricks.some(b => !b.alive || b.joints.size < b.initJoints)) {
+      s.mastBroken = true;
+      Sound.event('crash', { x: s.hull.getPosition().x });
+    }
     const total = s.cabinBricks.length;
     const intact = s.cabinBricks.filter(b => !this.brickLost(s, b)).length;
     s.crew = Math.max(CFG.ships.crewMin, total ? intact / total : 1);
@@ -791,6 +819,17 @@ const Game = {
   // Сколько секунд осталось продержаться (только в бою на удержание), иначе null
   surviveLeft() {
     return CFG.win.type === 'survive' ? Math.max(0, CFG.win.time - this.time) : null;
+  },
+
+  // Через сколько секунд уйдёт ближайший корабль со сроком (leaveAt), иначе null
+  leaveLeft() {
+    let left = null;
+    for (const s of this.ships) {
+      if (!s.alive || s.retreat || s.leaveAt === null) continue;
+      const l = Math.max(0, s.leaveAt - this.time);
+      if (left === null || l < left) left = l;
+    }
+    return left;
   },
 
   // Итоги боя и звёзды: 1 — победа, 2 — крепость цела больше чем на stars.fortress,

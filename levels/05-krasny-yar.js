@@ -24,6 +24,13 @@ Levels.add({
     { t: 60, type: 'frigate', stopX: 36, name: 'Pique' },
   ],
 
+  tutorial: [
+    { focus: 'ball', when: g => g.ballTypes().length > 1,
+      text: 'Q или кнопка ядра — сменить ядро. Тяжёлое бьёт сильнее и ложится точнее, но летит медленнее и заряжается дольше.',
+      done: (g, s) => g.cannon.ballType !== s.ballType, after: 15 },
+    { when: Tutorial.shipInView, text: 'Батарея стоит высоко: ядро падает сверху, и далеко бьёт даже малый заряд — берегите порох.', after: 8 },
+  ],
+
   win: 'sinkAll',
-  stars: { fortress: 0.75, powder: 80 },
+  stars: { fortress: 0.75, powder: 95 },
 });

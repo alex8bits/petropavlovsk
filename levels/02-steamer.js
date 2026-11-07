@@ -20,6 +20,15 @@ Levels.add({
     { t: 1, type: 'steamer', stopX: 28, name: 'Пароход', speedMul: 1.45, hpMul: 1.4, leaveAt: 75 },
   ],
 
+  tutorial: [
+    { when: Tutorial.shipInView, text: 'Пароход идёт быстро. Цельтесь впереди него: пока ядро летит, он уходит дальше.', after: 8 },
+    { focus: 'status', text: 'Справа — через сколько он уйдёт. Не успеете потопить — бой проигран.', after: 7 },
+    { text: 'Гребное колесо у борта и мачта — слабые места: каждое разбитое отнимает у парохода треть хода.', after: 9 },
+    { focus: 'cannonHp', when: g => g.cannon.repair > 0,
+      text: () => `Пушку разбило: расчёт чинит её ${fmtNum(CFG.playerCannon.repairTime)} с. Пушки врага тоже чинят — попадание по ним даёт передышку.`,
+      done: g => g.cannon.repair <= 0 },
+  ],
+
   win: 'sinkAll',
-  stars: { fortress: 0.75, powder: 30 },
+  stars: { fortress: 0.75, powder: 35 },
 });

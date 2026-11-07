@@ -24,6 +24,12 @@ Levels.add({
     { t: 26, type: 'sloop',   stopX: 39, name: 'Eurydice', flag: 'france', hpMul: 1.3 },
   ],
 
+  tutorial: [
+    { focus: 'ball', when: g => g.ammoLeft('hot') > 0,
+      text: 'Калёное ядро (Q) поджигает корабль. Команда тушит огонь, но пожар у рубки ей не погасить — корабль сгорит.',
+      done: g => g.cannon.ballType === 'hot', after: 15 },
+  ],
+
   win: 'sinkAll',
-  stars: { fortress: 0.75, powder: 90 },
+  stars: { fortress: 0.75, powder: 75 },
 });

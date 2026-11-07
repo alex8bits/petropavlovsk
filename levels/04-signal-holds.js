@@ -22,6 +22,11 @@ Levels.add({
     { t: 24, type: 'frigate', stopX: 38, name: 'Pique' },
   ],
 
+  tutorial: [
+    { focus: 'status', when: Tutorial.shipInView,
+      text: 'Бой на удержание: продержитесь до отхода эскадры — таймер справа. Топить всех не обязательно, берегите крепость.', after: 10 },
+  ],
+
   win: { type: 'survive', time: 150 },
-  stars: { fortress: 0.75, powder: 90 },
+  stars: { fortress: 0.75, powder: 105 },
 });

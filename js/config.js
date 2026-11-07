@@ -206,7 +206,7 @@ const BASE_CFG = {
   // Казна: награда за потопленный корабль (по типу) и за каждую впервые полученную звезду, руб.
   economy: {
     shipReward: { target: 10, sloop: 60, steamer: 70, frigate: 90, flagship: 150 },
-    starReward: 70,
+    starReward: 90,
   },
 
   lose: {

@@ -22,7 +22,14 @@ Levels.add({
     { t: 50, type: 'sloop',   stopX: 38, name: 'Eurydice', flag: 'france', hpMul: 1.2 },
   ],
 
+  tutorial: [
+    { when: Tutorial.shipInView, text: 'Кораблей несколько. Бейте ближнего: в него проще попасть, а дальний ещё не подошёл.', after: 8 },
+    { focus: 'fortGuns', text: g => g.fortGuns.length
+      ? 'Пушки поддержки на крепости стреляют сами — по ближнему кораблю в пределах дальности. Враг может их разбить.'
+      : 'Пушек поддержки у вас нет: их ставят в мастерской за казну, которую дают потопленные корабли.', after: 9 },
+  ],
+
   win: 'sinkAll',
   // Бот тратит 92–97 мешков
-  stars: { fortress: 0.75, powder: 110 },
+  stars: { fortress: 0.75, powder: 120 },
 });

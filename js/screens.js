@@ -136,6 +136,7 @@ const Screens = {
         <div class="col">
           ${cont ? `<button class="primary" data-act="map">Продолжить</button>` : ''}
           <button class="${cont ? '' : 'primary'}" data-act="newCampaign">Новая кампания</button>
+          <button data-act="settings">Настройки</button>
         </div>
         ${cont ? `<p class="note">Звёзд: ${Profile.totalStars()} из ${Levels.list.length * 3}${Profile.campaignDone() ? ' · кампания пройдена' : ''}</p>` : ''}
       </div>`;
@@ -261,6 +262,34 @@ const Screens = {
       </div>`;
   },
 
+  // Настройки: звук, подсказки обучения, справка по управлению. back — экран, куда вернуться
+  settings() {
+    const S = Settings.data;
+    const toggle = (key, label, hint) => `
+      <label class="toggle"><span><b>${label}</b><small>${hint}</small></span>
+        <button class="switch${S[key] ? ' on' : ''}" data-act="toggle" data-key="${key}" aria-pressed="${S[key]}">${S[key] ? 'вкл' : 'выкл'}</button>
+      </label>`;
+    return `
+      <div class="panel wide settings">
+        <h2>Настройки</h2>
+        ${toggle('sound', 'Звук', 'Выстрелы, попадания и прибой. M — включить или выключить в любой момент')}
+        <label class="toggle"><span><b>Громкость</b></span>
+          <input type="range" min="0" max="100" step="5" value="${Math.round(S.volume * 100)}" data-set="volume" ${S.sound ? '' : 'disabled'}>
+        </label>
+        ${toggle('hints', 'Подсказки', 'Обучение по ходу боя, пока бой ещё не выигран')}
+        <h3>Управление в бою</h3>
+        <dl class="keys">
+          <dt>↑ ↓ или колесо мыши</dt><dd>угол ствола</dd>
+          <dt>← → или кнопки 1–5</dt><dd>заряд пороха, мешков</dd>
+          <dt>Пробел или «Огонь!»</dt><dd>выстрел</dd>
+          <dt>Q или кнопка ядра</dt><dd>сменить ядро (когда есть покупные)</dd>
+          <dt>Esc</dt><dd>пауза</dd>
+          <dt>M</dt><dd>звук вкл/выкл</dd>
+        </dl>
+        <div class="row"><button class="primary" data-act="back">Готово</button></div>
+      </div>`;
+  },
+
   pause() {
     return `
       <div class="panel">
@@ -268,6 +297,7 @@ const Screens = {
         <div class="col">
           <button class="primary" data-act="resume">Продолжить</button>
           <button data-act="restart">Начать бой заново</button>
+          <button data-act="settings" data-back="pause">Настройки</button>
           <button data-act="quit">Выйти на карту</button>
         </div>
         <p class="note">Esc — продолжить</p>

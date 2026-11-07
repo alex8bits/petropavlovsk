@@ -9,7 +9,11 @@ const App = {
     this.root = document.getElementById('ui');
     this.root.addEventListener('click', e => {
       const b = e.target.closest('[data-act]');
-      if (b && !b.disabled) this.act(b.dataset.act, b.dataset);
+      if (b && !b.disabled) { Sound.play('click'); this.act(b.dataset.act, b.dataset); }
+    });
+    // Ползунок громкости
+    this.root.addEventListener('input', e => {
+      if (e.target.dataset.set === 'volume') Settings.set('volume', e.target.value / 100);
     });
     Profile.load();
     this.show('menu');
@@ -48,6 +52,9 @@ const App = {
       case 'buyUpgrade': Profile.buyUpgrade(data.key); return this.refresh();
       case 'buyAmmo': Profile.buyAmmo(data.type); return this.refresh();
       case 'fortSpot': Profile.setFortSpot(data.spot); return this.act('briefing', { id: data.id });
+      case 'settings': return this.show('settings', { back: data.back || 'menu' });
+      case 'toggle': Settings.set(data.key, !Settings.data[data.key]); return this.refresh();
+      case 'back': return this.show(this.params.back || 'menu');
       case 'resume': return this.resume();
       case 'restart': return this.startBattle(Game.level);
       case 'quit': Game.stop(); return this.show('map');
@@ -100,8 +107,11 @@ window.addEventListener('keydown', e => {
     if (App.screen === 'battle') App.pause();
     else if (App.screen === 'pause') App.resume();
     else if (App.screen === 'briefing' || App.screen === 'workshop') App.show('map');
+    else if (App.screen === 'settings') App.act('back');
     return;
   }
+  // M — звук вкл/выкл (на любом экране)
+  if (e.code === 'KeyM' && !e.repeat) { Settings.set('sound', !Settings.data.sound); if (App.screen === 'settings') App.refresh(); }
   if (App.screen !== 'battle' || !Game.active || Game.paused) return;
   Game.keys[e.code] = true;
   const c = Game.cannon;
@@ -135,6 +145,9 @@ function frame(now) {
     acc -= dt;
   }
   Render.draw(Game.active ? Game : null);
+  // Прибой: громче при сильном волнении; в бою на паузе и в меню — тише
+  const swell = CFG.water.waves.reduce((a, w) => a + w[0], 0) / 0.4;
+  Sound.updateAmbient(swell * (Game.active && !Game.paused ? 1 : 0.6));
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

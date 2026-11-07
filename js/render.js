@@ -634,6 +634,16 @@ const Render = {
 
     // Левая панель: пушка
     const px = 12 * u, py = 12 * u, pw = 300 * u, ph = 144 * u;
+    const rw = 250 * u, rx = this.canvas.width - rw - 12 * u, ry = 12 * u;
+    // Области интерфейса — для подсветки в подсказках обучения
+    const box = (x, y, w, h) => ({ x, y, w, h });
+    this.hud = {
+      angle: box(px + 4 * u, py + 5 * u, 100 * u, 26 * u), store: box(px + 104 * u, py + 5 * u, 192 * u, 26 * u),
+      powder: box(px + 74 * u, py + 29 * u, 214 * u, 38 * u), ball: box(px + 10 * u, py + 70 * u, 184 * u, 30 * u),
+      fire: box(px + 198 * u, py + 70 * u, 92 * u, 30 * u),
+      status: box(rx + 4 * u, ry + 5 * u, rw - 8 * u, 26 * u), cannonHp: box(rx + 4 * u, ry + 33 * u, rw - 8 * u, 26 * u),
+      fortress: box(rx + 4 * u, ry + 59 * u, rw - 8 * u, 26 * u), fortGuns: box(rx + 4 * u, ry + 87 * u, rw - 8 * u, 26 * u),
+    };
     ctx.fillStyle = 'rgba(15, 25, 35, 0.72)';
     this.roundRect(px, py, pw, ph, 8 * u); ctx.fill();
     ctx.fillStyle = '#fff';
@@ -692,14 +702,14 @@ const Render = {
 
     // Правая панель: состояние
     ctx.font = `${14 * u}px system-ui, sans-serif`;
-    const rw = 250 * u, rx = this.canvas.width - rw - 12 * u, ry = 12 * u;
     ctx.fillStyle = 'rgba(15, 25, 35, 0.72)';
     this.roundRect(rx, ry, rw, 120 * u, 8 * u); ctx.fill();
     ctx.fillStyle = '#fff';
-    const remain = game.surviveLeft();
+    const remain = game.surviveLeft(), leave = game.leaveLeft();
+    const mmss = t => { const n = Math.ceil(t); return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`; };
     const status = `Потоплено: ${game.sunk} / ${CFG.fleet.length}`;
-    const lt = Math.ceil(remain || 0);
-    ctx.fillText(remain === null ? status : `${status} · держаться ${Math.floor(lt / 60)}:${String(lt % 60).padStart(2, '0')}`,
+    if (leave !== null) ctx.fillStyle = leave < 15 ? '#ff8a7a' : '#fff';
+    ctx.fillText(remain !== null ? `${status} · держаться ${mmss(remain)}` : leave !== null ? `${status} · уйдёт ${mmss(leave)}` : status,
       rx + 12 * u, ry + 18 * u);
     const bar = (label, k, y, color) => {
       ctx.fillStyle = '#fff';
@@ -720,6 +730,8 @@ const Render = {
     ctx.fillStyle = '#fff';
     ctx.fillText(`Пушки крепости: ${game.fortGuns.filter(g => g.alive).length} / ${game.fortGuns.length}`, rx + 12 * u, ry + 100 * u);
 
+    this.drawHint(game, u);
+
     // Итог
     if (game.state !== 'play') {
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -733,6 +745,56 @@ const Render = {
       ctx.fillText(game.message, this.canvas.width / 2, this.canvas.height / 2 + 20 * u);
       ctx.textAlign = 'left';
     }
+  },
+
+  // Подсказка обучения: плашка сверху между панелями и пульсирующая рамка вокруг того, о чём речь
+  drawHint(game, u) {
+    const h = Tutorial.current(game);
+    if (!h) return;
+    const ctx = this.ctx, W = this.canvas.width;
+    const pulse = 0.65 + 0.35 * Math.sin(Physics.time * 6);
+    ctx.save();
+    ctx.globalAlpha = h.fade;
+    if (h.focus) {
+      ctx.strokeStyle = `rgba(240, 192, 96, ${pulse})`;
+      ctx.lineWidth = 3 * u;
+      if (h.focus === 'cannon') {
+        const p = game.cannon.pivot;
+        ctx.beginPath(); ctx.arc(this.X(p.x + 0.4), this.Y(p.y + 0.3), 2.2 * this.s, 0, Math.PI * 2); ctx.stroke();
+      } else if (this.hud[h.focus]) {
+        const r = this.hud[h.focus];
+        this.roundRect(r.x, r.y, r.w, r.h, 6 * u); ctx.stroke();
+      }
+    }
+    // Плашка: в промежутке между левой и правой панелями
+    const left = 324 * u, right = W - 274 * u, bw = Math.min(560 * u, right - left), bx = (left + right - bw) / 2, by = 12 * u;
+    ctx.font = `${15 * u}px system-ui, sans-serif`;
+    const lines = this.wrap(h.text, bw - 28 * u);
+    const bh = 34 * u + lines.length * 21 * u;
+    ctx.fillStyle = 'rgba(15, 25, 35, 0.86)';
+    this.roundRect(bx, by, bw, bh, 8 * u); ctx.fill();
+    ctx.strokeStyle = 'rgba(201, 154, 82, 0.8)'; ctx.lineWidth = 1.5 * u;
+    this.roundRect(bx, by, bw, bh, 8 * u); ctx.stroke();
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#c99a52';
+    ctx.font = `${12 * u}px system-ui, sans-serif`;
+    ctx.fillText(`Подсказка ${h.n} из ${h.total}`, bx + 14 * u, by + 15 * u);
+    ctx.fillStyle = '#fff';
+    ctx.font = `${15 * u}px system-ui, sans-serif`;
+    lines.forEach((l, i) => ctx.fillText(l, bx + 14 * u, by + 37 * u + i * 21 * u));
+    ctx.restore();
+  },
+
+  // Перенос строки по ширине (в пикселях канваса при текущем шрифте)
+  wrap(text, maxW) {
+    const out = [];
+    let line = '';
+    for (const w of text.split(' ')) {
+      const t = line ? `${line} ${w}` : w;
+      if (line && this.ctx.measureText(t).width > maxW) { out.push(line); line = w; } else line = t;
+    }
+    if (line) out.push(line);
+    return out;
   },
 
   roundRect(x, y, w, h, r) {

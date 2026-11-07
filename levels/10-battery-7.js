@@ -26,5 +26,5 @@ Levels.add({
   ],
 
   win: 'sinkAll',
-  stars: { fortress: 0.75, powder: 100 },
+  stars: { fortress: 0.75, powder: 115 },
 });

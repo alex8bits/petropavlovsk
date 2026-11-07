@@ -23,6 +23,10 @@ Levels.add({
     { t: 34, type: 'sloop',   stopX: 36, name: 'Eurydice', flag: 'france', hpMul: 1.3 },
   ],
 
+  tutorial: [
+    { when: Tutorial.shipInView, text: 'Туман скрывает дальние корабли, а волна сильнее их раскачивает. Бейте тех, что подошли ближе.', after: 9 },
+  ],
+
   win: 'sinkAll',
-  stars: { fortress: 0.75, powder: 80 },
+  stars: { fortress: 0.75, powder: 75 },
 });
