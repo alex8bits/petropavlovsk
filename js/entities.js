@@ -155,6 +155,7 @@ const Entities = {
       name: opts.name || T.name, flag: opts.flag || 'uk', speedMul: opts.speedMul || 1, retreat: false,
       leaveAt: opts.leaveAt ?? null, // с от начала боя: тогда корабль уходит (не потопили — бой проигран)
       cannons: [], bricks: [], removed: false,
+      fires: [], // очаги пожара: { x, y } в координатах корпуса, power 0…1
     };
     ship.holdArea = Physics.polyArea(ship.hold);
     hull.setUserData(ship);
@@ -240,7 +241,8 @@ const Entities = {
     const body = Physics.world.createBody({ type: 'dynamic', position: V(x, y), bullet: true });
     body.createFixture(new pl.Circle(B.radius), { density: B.density, friction: 0.4, restitution: 0.25 });
     body.setLinearVelocity(V(vx, vy));
-    const ball = { kind: 'ball', type: typeKey, B, owner, body, hits: 0, age: 0, inWater: false, alive: true };
+    // heat — накал калёного ядра (1 — из печи, 0 — остыло; у остальных всегда 0)
+    const ball = { kind: 'ball', type: typeKey, B, owner, body, hits: 0, age: 0, inWater: false, alive: true, heat: B.ignite ? 1 : 0 };
     body.setUserData(ball);
     return ball;
   },

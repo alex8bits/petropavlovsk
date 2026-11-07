@@ -446,6 +446,18 @@ const Render = {
     for (const b of sh.bricks) if (b.alive) this.drawBrick(b);
     if (sh.wheel) this.drawWheel(sh);
 
+    // Очаги пожара: зарево на корпусе
+    for (const f of sh.fires) {
+      const w = sh.hull.getWorldPoint(V(f.x, f.y)), r = (0.5 + f.power * 0.9) * s;
+      const flick = 0.85 + Math.random() * 0.15;
+      const g = ctx.createRadialGradient(this.X(w.x), this.Y(w.y), 0, this.X(w.x), this.Y(w.y), r);
+      g.addColorStop(0, `rgba(255, 200, 80, ${0.75 * flick * Math.min(1, f.power * 2)})`);
+      g.addColorStop(0.5, `rgba(240, 90, 20, ${0.4 * flick * Math.min(1, f.power * 2)})`);
+      g.addColorStop(1, 'rgba(200, 40, 0, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(this.X(w.x), this.Y(w.y), r, 0, Math.PI * 2); ctx.fill();
+    }
+
     // Флаг (британский или французский) на топе мачты: держится за верхний брусок и падает вместе с ним
     const top = sh.mastBricks[sh.mastBricks.length - 1];
     if (top && top.alive) {
@@ -505,6 +517,19 @@ const Render = {
   drawBall(b) {
     const ctx = this.ctx, p = b.body.getPosition();
     ctx.fillStyle = b.B.color;
+    // Калёное ядро светится, пока не остыло, и темнеет до чугунного
+    if (b.B.ignite) {
+      const k = b.heat;
+      ctx.fillStyle = `rgb(${43 + 207 * k | 0}, ${43 + 77 * k | 0}, ${43 - 13 * k | 0})`;
+      if (k > 0) {
+        const r = b.B.radius * this.s * 2.6;
+        const g = ctx.createRadialGradient(this.X(p.x), this.Y(p.y), 0, this.X(p.x), this.Y(p.y), r);
+        g.addColorStop(0, `rgba(255, 140, 40, ${0.5 * k})`); g.addColorStop(1, 'rgba(255, 80, 0, 0)');
+        const keep = ctx.fillStyle;
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(this.X(p.x), this.Y(p.y), r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = keep;
+      }
+    }
     ctx.beginPath(); ctx.arc(this.X(p.x), this.Y(p.y), b.B.radius * this.s, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.45)';
     ctx.lineWidth = Math.max(1, 0.025 * this.s);
@@ -581,10 +606,14 @@ const Render = {
     const ctx = this.ctx, s = this.s;
     for (const p of Particles.list) {
       // 'pour' (вода, затекающая в трюм) рисуется под слоем моря: ниже поверхности её не видно
-      const isFront = p.type === 'smoke' || p.type === 'drop';
+      const isFront = p.type === 'smoke' || p.type === 'drop' || p.type === 'flame';
       if (isFront !== front) continue;
       const a = Math.max(0, p.life / p.max);
-      if (p.type === 'smoke') {
+      if (p.type === 'flame') {
+        // Язык пламени: желтеет и тает к концу жизни
+        ctx.fillStyle = this.rgb([p.color[0], p.color[1] + (1 - a) * 60, p.color[2]], 1, Math.min(1, a * 1.4));
+        ctx.beginPath(); ctx.arc(this.X(p.x), this.Y(p.y), p.size * s * (0.5 + a * 0.5), 0, Math.PI * 2); ctx.fill();
+      } else if (p.type === 'smoke') {
         ctx.fillStyle = this.rgb(p.color, 1, a * 0.5);
         ctx.beginPath(); ctx.arc(this.X(p.x), this.Y(p.y), p.size * s, 0, Math.PI * 2); ctx.fill();
       } else {

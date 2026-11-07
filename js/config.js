@@ -55,6 +55,8 @@ const BASE_CFG = {
   balls: {
     iron:  { name: 'Чугунное', radius: 0.17, density: 20, damage: 1.0, hullDamage: 1.0, speedMul: 1, spread: 1.5, speedSpread: 0.04, reload: 2.0, color: '#2b2b2b' },
     heavy: { name: 'Тяжёлое',  radius: 0.23, density: 20, damage: 1.0, hullDamage: 1.0, speedMul: 0.85, spread: 1.0, speedSpread: 0.03, reload: 3.5, color: '#4a3a2a' },
+    // Калёное: раскалено в печи (ignite) — поджигает деревянный корабль; греется дольше, чем заряжают чугунное
+    hot:   { name: 'Калёное',  radius: 0.17, density: 20, damage: 1.0, hullDamage: 1.0, speedMul: 1, spread: 1.5, speedSpread: 0.04, reload: 4.0, color: '#c8501e', ignite: true },
     // Ядро малого калибра для пушек на крепости (игроку не выдаётся)
     light: { name: 'Лёгкое',   radius: 0.12, density: 20, damage: 1.0, hullDamage: 1.0, speedMul: 1, spread: 2.0, speedSpread: 0.05, reload: 2.0, color: '#3a3a3a' },
   },
@@ -132,6 +134,12 @@ const BASE_CFG = {
       cannons: [-2.4], mastX: -1.1, mastHeight: 5, cabinCols: 3, cabinRows: 2,
       wheel: { x: 0.3, r: 0.75 }, funnel: { x: 0.3, h: 1.7, w: 0.32 },
     },
+    // Флагман: крупнее фрегата, три пушки, прочный корпус и большая рубка (много команды)
+    flagship: {
+      name: 'Флагман', hp: 560, scale: 1.0, hullDensity: 1.2,
+      speed: 0.5, fireDelay: [5.0, 7.0], aimError: 1.0,
+      cannons: [-2.6, -1.5, 0.0], mastX: -0.75, mastHeight: 8, cabinCols: 4, cabinRows: 3,
+    },
     // Учебный щит: плот с дощатым щитом, без пушек и мачты; стоит на якоре
     target: {
       name: 'Учебный щит', hp: 120, scale: 0.55, hullDensity: 1.2,
@@ -168,6 +176,21 @@ const BASE_CFG = {
     sinkFraction: 0.55,  // трюм залит на эту долю — корабль тонет
   },
 
+  // Пожар от калёного ядра. Очаг — точка на корпусе с силой power (0…1): растёт сам (growth),
+  // команда тушит (extinguish × доля команды). Огонь ест корпус (burnDps × power HP/с) и доски
+  // в радиусе radius (рубка — команда, мачта — ход). Калёное ядро в трюме подпитывает огонь, пока не остынет.
+  fire: {
+    ignite: 0.5,         // сила очага от попадания калёного ядра
+    growth: 0.04,        // рост силы в секунду
+    extinguish: 0.06,    // тушение в секунду при полной команде
+    burnDps: 12,         // урон корпусу при силе 1, HP/с
+    burnBrick: 12,       // урон доскам рядом с очагом при силе 1, HP/с
+    radius: 0.8,        // м
+    holdFeed: 0.08,      // подпитка от ядра в трюме, силы в секунду
+    heatTime: 15,        // с: за столько ядро остывает (в воде — сразу)
+    maxFires: 3,         // очагов на корабле (новое попадание рядом — усиливает очаг)
+  },
+
   // Земляной вал перед стеной (прокачка «Крепость»): статичный откос между стеной и пушкой игрока.
   // Принимает ядра на себя и не рушится; в целостность крепости не входит.
   rampart: {
@@ -182,7 +205,7 @@ const BASE_CFG = {
 
   // Казна: награда за потопленный корабль (по типу) и за каждую впервые полученную звезду, руб.
   economy: {
-    shipReward: { target: 10, sloop: 60, steamer: 70, frigate: 90 },
+    shipReward: { target: 10, sloop: 60, steamer: 70, frigate: 90, flagship: 150 },
     starReward: 70,
   },
 

@@ -33,7 +33,7 @@ const Bot = {
     }
     if (!target) return;
     const sp = target.hull.getPosition(), sv = target.hull.getLinearVelocity();
-    if (Game.ammoLeft(c.ballType) <= 0) c.ballType = 'iron';
+    c.ballType = this.pickBall();
     const B = CFG.balls[c.ballType];
     for (let pw = 1; pw <= MAX_POWDER; pw++) {
       const v = CFG.powderSpeed[pw] * B.speedMul;
@@ -53,13 +53,20 @@ const Bot = {
     }
   },
 
+  // Первый тип из предпочтений, которым ещё есть чем стрелять (иначе чугунное)
+  pickBall() {
+    return this.balls.find(t => Game.ammoLeft(t) > 0) || 'iron';
+  },
+
+  // ball — тип ядра или список по предпочтению, например ['hot', 'heavy']
   run(id, { passive = false, maxTime = 600, ball = 'iron', profile = 'zero' } = {}) {
     const level = Levels.get(id);
     if (!level) throw new Error(`Нет уровня ${id}`);
     Game.stop();
     Game.start(level, this.profileOf(profile));
     Game.paused = true;
-    Game.cannon.ballType = Game.ammoLeft(ball) > 0 ? ball : 'iron';
+    this.balls = Array.isArray(ball) ? ball : [ball];
+    Game.cannon.ballType = this.pickBall();
     const dt = CFG.world.step;
     while (!Game.endReported && Game.time < maxTime) {
       if (!passive && Game.state === 'play') this.aim();
@@ -76,7 +83,7 @@ const Bot = {
     return out;
   },
 
-  // Прогон всех боёв по runs раз. Тяжёлым ядром бот стреляет, пока оно есть.
+  // Прогон всех боёв по runs раз. Калёным, затем тяжёлым ядром бот стреляет, пока они есть.
   // Bot.report: [{ id, wins, runs, results: [...] }]; Bot.done — закончил ли.
   async campaign({ profile = 'zero', runs = 3, passive = false, ids = null } = {}) {
     this.report = [];
@@ -86,7 +93,7 @@ const Bot = {
       const row = { id: level.id, n: level.n, wins: 0, runs, results: [] };
       this.report.push(row);
       for (let i = 0; i < runs; i++) {
-        const r = this.run(level.id, { profile, passive, ball: 'heavy' });
+        const r = this.run(level.id, { profile, passive, ball: ['hot', 'heavy'] });
         row.results.push(`${r.state} ${r.sunk} к${r.integrity} п${r.powder} ★${r.stars}`);
         if (r.state === 'win') row.wins++;
         await new Promise(res => setTimeout(res, 0)); // дать вкладке подышать

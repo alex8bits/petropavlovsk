@@ -148,6 +148,11 @@ const Game = {
       // Вражеские ядра бьют по кладке сильнее на CFG.ships.shellPower (по пушке — как раньше)
       const boost = ball.owner !== 'player' && target.kind === 'brick';
       const energy = boost ? imp.energy * CFG.ships.shellPower : imp.energy;
+      // Калёное ядро поджигает корабль, во что бы на нём ни попало (один раз на ядро)
+      if (ball.heat > 0 && !ball.ignited) {
+        const ship = this.shipOf(target) || target.ship;
+        if (ship && ship.alive) { ball.ignited = true; this.ignite(ship, x, y, CFG.fire.ignite * ball.heat); }
+      }
       if (target.kind === 'brick' && target.alive) {
         this.damageBrick(target, energy * CFG.brick.damagePerJoule * ball.B.damage);
         this.shockwave(x, y, energy);
@@ -285,6 +290,49 @@ const Game = {
     const k = T.scale, top = s.hull.getWorldPoint(V(T.funnel.x * k, s.hh + T.funnel.h * k));
     Particles.spawn({ type: 'smoke', x: top.x, y: top.y, vx: 0.6 + Math.random() * 0.4, vy: 0.8 + Math.random() * 0.5,
       g: 0.2, size: 0.15 + Math.random() * 0.15, life: 1.6 + Math.random(), max: 2.6, color: [105, 102, 98] });
+  },
+
+  // ---------- Пожар ----------
+  // Очаг в точке (x, y) мира: рядом с существующим — усиливает его, иначе новый (не больше maxFires)
+  ignite(ship, x, y, power) {
+    const F = CFG.fire, l = ship.hull.getLocalPoint(V(x, y));
+    const p = { x: Math.max(-ship.halfWidthAt(ship.hh), Math.min(ship.halfWidthAt(ship.hh), l.x)),
+      y: Math.max(-ship.hh * 0.5, Math.min(ship.hh + 0.3, l.y)) };
+    let near = null, best = Infinity;
+    for (const f of ship.fires) { const d = Math.hypot(f.x - p.x, f.y - p.y); if (d < best) { best = d; near = f; } }
+    if (near && (best < 1 || ship.fires.length >= F.maxFires)) near.power = Math.min(1, near.power + power);
+    else ship.fires.push({ x: p.x, y: p.y, power: Math.min(1, power) });
+  },
+
+  // Огонь растёт, команда тушит; горят корпус и доски рядом. Под водой очаг гаснет.
+  updateFire(s, dt) {
+    if (!s.fires.length) return;
+    const F = CFG.fire;
+    for (const f of s.fires) {
+      const w = s.hull.getWorldPoint(V(f.x, f.y));
+      if (w.y < Physics.waterY(w.x)) { f.power = 0; Particles.smoke(w.x, w.y + 0.2, 0, 1, 3); continue; }
+      if (s.alive) {
+        f.power = Math.min(1, f.power + (F.growth - F.extinguish * s.crew) * dt);
+        if (f.power <= 0) continue;
+        s.hp -= F.burnDps * f.power * dt;
+        for (const b of s.bricks) {
+          if (!b.alive) continue;
+          const bp = b.body.getPosition();
+          if (Math.hypot(bp.x - w.x, bp.y - w.y) < F.radius) this.damageBrick(b, F.burnBrick * f.power * dt);
+        }
+      } else f.power -= dt * 0.08; // мёртвый корабль догорает, пока не уйдёт под воду
+      this.flameParticles(w, f.power, dt);
+    }
+    s.fires = s.fires.filter(f => f.power > 0);
+    if (s.alive && s.hp <= 0) this.killShip(s);
+  },
+
+  flameParticles(w, power, dt) {
+    if (Math.random() < dt * 30 * power) Particles.spawn({ type: 'flame', x: w.x + (Math.random() - 0.5) * 0.5, y: w.y,
+      vx: (Math.random() - 0.5) * 0.6, vy: 1 + Math.random() * 1.5, g: 0, size: 0.12 + Math.random() * 0.16 * (0.5 + power),
+      life: 0.4 + Math.random() * 0.3, max: 0.7, color: [255, 150 + Math.random() * 80 | 0, 40] });
+    if (Math.random() < dt * 8 * power) Particles.spawn({ type: 'smoke', x: w.x, y: w.y + 0.5, vx: 0.3 + Math.random() * 0.4,
+      vy: 0.8 + Math.random() * 0.6, g: 0.2, size: 0.2 + Math.random() * 0.25, life: 1.8 + Math.random(), max: 2.8, color: [60, 55, 50] });
   },
 
   // Доля скорости корабля с учётом повреждений движителей
@@ -564,6 +612,7 @@ const Game = {
       }
       if (s.alive) this.updateShipDamage(s);
       if (s.alive && s.wheel) this.steamerEffects(s, dt);
+      this.updateFire(s, dt);
       const sub = Physics.applyBuoyancyPoints(s.hull, s.points, s.cellH, mul);
       this.updateFlooding(s, dt);
       if (s.alive && sub > 0) {
@@ -614,6 +663,12 @@ const Game = {
         if (!b.wasWet) b.hits += 2; // в воде ядро теряет силу
         b.wasWet = true;
         Particles.splash(p.x, surf, Math.abs(v.y));
+        if (b.heat > 0) { b.heat = 0; Particles.smoke(p.x, surf, 0, 1, 5); } // калёное шипит и гаснет
+      }
+      if (b.heat > 0) {
+        b.heat = Math.max(0, b.heat - dt / CFG.fire.heatTime);
+        // Калёное ядро в трюме поджигает корабль изнутри, пока не остынет
+        if (inHold && inHold.alive) this.ignite(inHold, p.x, p.y, CFG.fire.holdFeed * b.heat * dt);
       }
       b.inWater = inWater;
       if (inWater) Physics.applyBuoyancySimple(b.body, Math.PI * b.B.radius * b.B.radius, b.B.radius);

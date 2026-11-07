@@ -9,16 +9,25 @@ Levels.add({
   history: 'Батарея № 3 лейтенанта Александра Максутова почти без бруствера стояла против President и Forte, ' +
     'к которым подошли Pique и Eurydice. За потери её прозвали «Смертельной»; Максутов был смертельно ранен. ' +
     'Высадку отбили, и через три дня эскадра ушла из губы.',
-  briefing: 'Последний бой. Флагман President прочнее остальных. Кладка низкая — берегите её, ' +
-    'выбивайте пушки и топите корабли по одному.',
+  briefing: 'Последний бой. Флагман President — три пушки, прочный корпус и большая команда: ' +
+    'пока рубка цела, он быстро чинится и откачивает воду. Кладка низкая — берегите её, ' +
+    'выбивайте пушки и топите корабли по одному. На батарею выдали три калёных ядра.',
 
   config: {
     powderStore: { start: 90 },
+    ammo: { hot: 3 },
+    // Под нулевую прокачку: низкая кладка батареи не держит полный темп огня всей эскадры
+    ships: {
+      flagship: { fireDelay: [6, 8.4] },
+      frigate: { fireDelay: [6, 8.4] },
+      sloop: { fireDelay: [5.4, 7.8] },
+      steamer: { fireDelay: [5.4, 7.8] },
+    },
   },
 
   fleet: [
     { t: 1,  type: 'steamer', stopX: 32, name: 'Virago' },
-    { t: 6,  type: 'frigate', stopX: 28, name: 'President', hpMul: 1.5 },
+    { t: 6,  type: 'flagship', stopX: 28, name: 'President' },
     { t: 20, type: 'frigate', stopX: 34, name: 'Forte', flag: 'france', hpMul: 1.2 },
     { t: 40, type: 'sloop',   stopX: 37, name: 'Obligado', flag: 'france' },
     { t: 56, type: 'frigate', stopX: 31, name: 'Pique' },
