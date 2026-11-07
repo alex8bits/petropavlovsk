@@ -12,17 +12,17 @@ Levels.add({
     'чем дольше корабли целы, тем меньше остаётся от батареи.',
 
   config: {
-    powderStore: { start: 80, capacity: 90, resupplyEvery: 5 },
+    powderStore: { start: 80 },
     ships: {
-      frigate: { fireDelay: [3.6, 5.0] },
-      sloop: { fireDelay: [3.4, 4.8] },
+      frigate: { fireDelay: [3.9, 5.3] },
+      sloop: { fireDelay: [3.7, 5.1] },
     },
   },
 
   fleet: [
     { t: 1,  type: 'sloop',   stopX: 31, name: 'Virago' },
     { t: 8,  type: 'frigate', stopX: 27, name: 'President', hpMul: 1.2 },
-    { t: 24, type: 'frigate', stopX: 34, name: 'Forte', flag: 'france', hpMul: 1.2 },
+    { t: 32, type: 'frigate', stopX: 34, name: 'Forte', flag: 'france', hpMul: 1.2 },
   ],
 
   win: 'sinkAll',

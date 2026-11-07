@@ -12,7 +12,7 @@ Levels.add({
     'Они бьют сами по ближайшему кораблю, вы выбираете цель.',
 
   config: {
-    powderStore: { start: 80, capacity: 80, resupplyEvery: 5 },
+    powderStore: { start: 80 },
   },
 
   fleet: [

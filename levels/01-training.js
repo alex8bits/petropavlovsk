@@ -12,7 +12,7 @@ Levels.add({
     'чем дальше щит, тем больше пороха нужно. Ядро ложится с разбросом — пристреливайтесь.',
 
   config: {
-    powderStore: { start: 60, capacity: 60, resupplyEvery: 5 },
+    powderStore: { start: 60 },
     fortGuns: { count: 0 },
   },
 

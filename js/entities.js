@@ -49,17 +49,37 @@ const Entities = {
     }
 
     // Места для автоматических пушек: стена (в последнем промежутке между зубцами) и верх башни.
-    // CFG.fortGuns.count = 1 — только на стене.
+    // Одна пушка при двух местах — там, где выбрал игрок (CFG.fortGuns.spot).
     let gap = wallCols - 1;
     if (gap % 2 === 0) gap--;
-    this.fortGunSpots = [{ x: x0 + (gap + 0.5) * m.w, y: top + wallRows * m.h }];
-    if (towerRows > 0) this.fortGunSpots.push({ x: x0 + towerCols * m.w / 2, y: top + (wallRows + towerRows) * m.h });
-    this.fortGunSpots = this.fortGunSpots.slice(0, CFG.fortGuns.count);
+    const spots = [{ x: x0 + (gap + 0.5) * m.w, y: top + wallRows * m.h, key: 'wall' }];
+    if (towerRows > 0) spots.push({ x: x0 + towerCols * m.w / 2, y: top + (wallRows + towerRows) * m.h, key: 'tower' });
+    if (CFG.fortGuns.spot === 'tower') spots.reverse();
+    this.fortGunSpots = spots.slice(0, CFG.fortGuns.count);
 
     return Physics.buildBricks({
       rects, material: m, frame: null, anchorBody: ground,
       onBase: r => Math.abs(r.y - r.h / 2 - top) < 0.01, owner: 'fortress',
     });
+  },
+
+  // ---------- Земляной вал ----------
+  // Статичная насыпь вплотную к стене со стороны моря: тыл отвесный, гребень, откос к пушке игрока.
+  // Высота — доля высоты стены по уровню прокачки; без прокачки вала нет (null).
+  createRampart() {
+    const R = CFG.rampart, F = CFG.fortress, m = CFG.brick.stone, top = CFG.shore.topY;
+    const k = R.heights[R.level] || 0;
+    if (k <= 0) return null;
+    const xa = F.x0 + F.wallCols * m.w + 0.03;
+    const xb = Math.min(xa + R.width, CFG.playerCannon.x - 0.75 - 0.15);
+    const h = k * F.wallRows * m.h;
+    const crest = xa + Math.max(0.2, (xb - xa) * 0.3);
+    const verts = [{ x: xa, y: top }, { x: xb, y: top }, { x: crest, y: top + h }, { x: xa, y: top + h }];
+    const body = Physics.world.createBody({ type: 'static' });
+    body.createFixture(new pl.Polygon(verts.map(p => V(p.x, p.y))), { friction: 0.9, restitution: 0 });
+    const rampart = { kind: 'rampart', body, verts, level: R.level };
+    body.setUserData(rampart);
+    return rampart;
   },
 
   // ---------- Автоматическая пушка на крепости ----------

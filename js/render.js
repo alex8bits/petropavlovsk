@@ -81,6 +81,7 @@ const Render = {
       return;
     }
     for (const b of game.fortress) if (b.alive) this.drawBrick(b);
+    if (game.rampart) this.drawRampart(game.rampart);
     this.drawPlayerCannon(game.cannon);
     for (const g of game.fortGuns) if (g.alive) this.drawFortGun(g);
     for (const sh of game.ships) this.drawShip(sh);
@@ -125,6 +126,42 @@ const Render = {
       const xEnd = S.edgeX + (S.topY - y) / (S.topY - W.seabedY) * (S.slopeEndX - S.edgeX);
       ctx.lineTo(this.X(xEnd - 0.2), this.Y(y + 0.15));
       ctx.stroke();
+    }
+  },
+
+  // Земляной вал: насыпь с дёрном на гребне; на высшем уровне — фашины (связки хвороста) по откосу
+  drawRampart(r) {
+    const ctx = this.ctx, C = this.groundColors[CFG.shore.kind] || this.groundColors.sand;
+    const v = r.verts;
+    ctx.fillStyle = '#7a6848';
+    ctx.beginPath();
+    v.forEach((p, i) => i ? ctx.lineTo(this.X(p.x), this.Y(p.y)) : ctx.moveTo(this.X(p.x), this.Y(p.y)));
+    ctx.closePath();
+    ctx.fill();
+    // Слои утрамбованной земли
+    ctx.strokeStyle = 'rgba(60, 45, 25, 0.35)';
+    ctx.lineWidth = 1.5;
+    const h = v[2].y - v[0].y;
+    for (let k = 0.25; k < 1; k += 0.25) {
+      const y = v[0].y + h * k, xr = v[1].x + (v[2].x - v[1].x) * k;
+      ctx.beginPath(); ctx.moveTo(this.X(v[0].x), this.Y(y)); ctx.lineTo(this.X(xr - 0.05), this.Y(y)); ctx.stroke();
+    }
+    // Дёрн на гребне и по откосу
+    ctx.strokeStyle = C.grass;
+    ctx.lineWidth = 0.12 * this.s;
+    ctx.beginPath();
+    ctx.moveTo(this.X(v[3].x), this.Y(v[3].y)); ctx.lineTo(this.X(v[2].x), this.Y(v[2].y)); ctx.lineTo(this.X(v[1].x), this.Y(v[1].y));
+    ctx.stroke();
+    if (r.level >= CFG.rampart.fascines) {
+      // Фашины — круглые связки хвороста рядами вдоль откоса
+      const n = Math.max(3, Math.round(h / 0.32));
+      for (let i = 0; i < n; i++) {
+        const k = (i + 0.5) / n, x = v[1].x + (v[2].x - v[1].x) * k - 0.12, y = v[1].y + h * k;
+        ctx.fillStyle = '#6b4a2a';
+        ctx.beginPath(); ctx.arc(this.X(x), this.Y(y), 0.15 * this.s, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#3e2a16'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(this.X(x), this.Y(y), 0.08 * this.s, 0, Math.PI * 2); ctx.stroke();
+      }
     }
   },
 
@@ -541,11 +578,13 @@ const Render = {
     }
     const B = CFG.balls[c.ballType];
     const tb = { x: px + 12 * u, y: py + 72 * u, w: 180 * u, h: 26 * u };
+    const choice = game.ballTypes().length > 1;
     ctx.fillStyle = 'rgba(255,255,255,0.12)';
     this.roundRect(tb.x, tb.y, tb.w, tb.h, 6 * u); ctx.fill();
     ctx.fillStyle = '#fff';
-    ctx.fillText(`Ядро: ${B.name}  (Q)`, tb.x + 8 * u, tb.y + tb.h / 2);
-    this.buttons.push({ ...tb, fn: () => { c.ballType = c.ballType === 'iron' ? 'heavy' : 'iron'; } });
+    const left = game.ammoLeft(c.ballType);
+    ctx.fillText(`Ядро: ${B.name}${isFinite(left) ? ` × ${left}` : ''}${choice ? '  (Q)' : ''}`, tb.x + 8 * u, tb.y + tb.h / 2);
+    if (choice) this.buttons.push({ ...tb, fn: () => game.cycleBall() });
     // Перезарядка
     const fb = { x: px + 200 * u, y: py + 72 * u, w: 88 * u, h: 26 * u };
     const reloaded = c.reload <= 0;
@@ -573,10 +612,10 @@ const Render = {
     ctx.fillStyle = 'rgba(15, 25, 35, 0.72)';
     this.roundRect(rx, ry, rw, 120 * u, 8 * u); ctx.fill();
     ctx.fillStyle = '#fff';
-    const left = game.surviveLeft();
+    const remain = game.surviveLeft();
     const status = `Потоплено: ${game.sunk} / ${CFG.fleet.length}`;
-    const lt = Math.ceil(left || 0);
-    ctx.fillText(left === null ? status : `${status} · держаться ${Math.floor(lt / 60)}:${String(lt % 60).padStart(2, '0')}`,
+    const lt = Math.ceil(remain || 0);
+    ctx.fillText(remain === null ? status : `${status} · держаться ${Math.floor(lt / 60)}:${String(lt % 60).padStart(2, '0')}`,
       rx + 12 * u, ry + 18 * u);
     const bar = (label, k, y, color) => {
       ctx.fillStyle = '#fff';

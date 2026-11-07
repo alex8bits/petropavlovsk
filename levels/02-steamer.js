@@ -12,7 +12,7 @@ Levels.add({
     'Долго он не задержится — потопите его, пока не ушёл.',
 
   config: {
-    powderStore: { start: 60, capacity: 60, resupplyEvery: 5 },
+    powderStore: { start: 60 },
     fortGuns: { count: 0 },
   },
 

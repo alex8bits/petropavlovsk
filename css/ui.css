@@ -120,3 +120,34 @@ svg.map .bat.done circle { fill: var(--win); }
 svg.map .bat.next circle { fill: var(--fire); }
 svg.map .bat .pulse { fill: none; stroke: var(--fire); stroke-width: 2; animation: pulse 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes pulse { from { opacity: 0.9; transform: scale(0.6); } to { opacity: 0; transform: scale(1.5); } }
+
+/* Казна и мастерская */
+.treasury { color: var(--powder); white-space: nowrap; }
+dd.reward { color: var(--powder); }
+dd.reward small { color: var(--muted); }
+.panel.workshop { width: min(1040px, 100%); }
+.workshop .head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.workshop .total { color: var(--muted); }
+.workshop .sub { font-size: 14px; }
+.branches { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px 18px; }
+.branch h3 { margin-top: 4px; }
+.branch .note { margin: 0 0 8px; }
+.upg { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; background: rgba(255, 255, 255, 0.03); }
+.upg-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.upg-val { margin: 2px 0; }
+.upg-val .arrow { color: var(--muted); }
+.upg-val .next { color: var(--win); }
+.upg small { color: var(--muted); display: block; font-size: 13px; }
+.upg-buy { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.upg-buy small.why { display: inline; color: var(--lose); }
+button.buy { padding: 5px 12px; font-size: 14px; }
+.maxed { color: var(--win); font-size: 14px; }
+.ammo-have { color: var(--powder); font-size: 14px; }
+.pips { display: inline-flex; gap: 3px; }
+.pip { width: 14px; height: 6px; border-radius: 2px; background: rgba(255, 255, 255, 0.15); }
+.pip.on { background: var(--powder); }
+.seg { display: inline-flex; gap: 0; margin-left: 4px; vertical-align: middle; }
+.seg button { padding: 2px 10px; font-size: 14px; border-radius: 0; }
+.seg button:first-child { border-radius: 6px 0 0 6px; }
+.seg button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+.seg button.on { background: var(--powder); color: #2a1c0c; border-color: var(--powder); }

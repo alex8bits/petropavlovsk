@@ -1,5 +1,5 @@
 // Приложение: переключатель экранов, ввод, игровой цикл.
-// Экраны: menu → map → briefing → battle (⇄ pause) → results → map …
+// Экраны: menu → map ⇄ workshop → briefing → battle (⇄ pause) → results → workshop / map …
 
 const App = {
   screen: null,
@@ -18,6 +18,7 @@ const App = {
   // Показать экран; 'battle' — без HTML поверх канваса
   show(name, params = {}) {
     this.screen = name;
+    this.params = params;
     if (name === 'battle') {
       this.root.innerHTML = '';
       this.root.classList.add('hidden');
@@ -43,10 +44,23 @@ const App = {
         return this.show('briefing', { level });
       }
       case 'start': return this.startBattle(Levels.get(data.id));
+      case 'workshop': Game.stop(); return this.show('workshop', { back: data.id });
+      case 'buyUpgrade': Profile.buyUpgrade(data.key); return this.refresh();
+      case 'buyAmmo': Profile.buyAmmo(data.type); return this.refresh();
+      case 'fortSpot': Profile.setFortSpot(data.spot); return this.act('briefing', { id: data.id });
       case 'resume': return this.resume();
       case 'restart': return this.startBattle(Game.level);
       case 'quit': Game.stop(); return this.show('map');
     }
+  },
+
+  // Перерисовать текущий экран (после покупки), сохранив прокрутку
+  refresh() {
+    const panel = this.root.querySelector('.branches'), top = panel ? panel.scrollTop : 0, pageTop = this.root.scrollTop;
+    this.show(this.screen, this.params);
+    const p2 = this.root.querySelector('.branches');
+    if (p2) p2.scrollTop = top;
+    this.root.scrollTop = pageTop;
   },
 
   startBattle(level) {
@@ -56,12 +70,12 @@ const App = {
     Game.onEnd = res => {
       const next = Levels.next(level);
       const wasOpen = next && Profile.isUnlocked(next);
-      const record = Profile.recordResult(level, res);
+      const { record, reward } = Profile.recordResult(level, res);
       // Бой, который открылся этим результатом, и конец кампании — для сообщения на экране итогов
       const unlocked = next && !wasOpen && Profile.isUnlocked(next) ? next : null;
       const finished = res.win && !next;
       // Бой идёт дальше за экраном итогов (ввод выключен) и уничтожается, когда игрок с него уйдёт
-      this.show('results', { level, res, record, unlocked, finished });
+      this.show('results', { level, res, record, reward, unlocked, finished });
     };
     this.show('battle');
   },
@@ -85,7 +99,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'Escape') {
     if (App.screen === 'battle') App.pause();
     else if (App.screen === 'pause') App.resume();
-    else if (App.screen === 'briefing') App.show('map');
+    else if (App.screen === 'briefing' || App.screen === 'workshop') App.show('map');
     return;
   }
   if (App.screen !== 'battle' || !Game.active || Game.paused) return;
@@ -95,7 +109,7 @@ window.addEventListener('keydown', e => {
   // Порох: ← меньше, → больше (1–5 мешков)
   if (e.code === 'ArrowRight') c.powder = Math.min(MAX_POWDER, c.powder + 1);
   if (e.code === 'ArrowLeft') c.powder = Math.max(1, c.powder - 1);
-  if (e.code === 'KeyQ' || e.code === 'Tab') { e.preventDefault(); c.ballType = c.ballType === 'iron' ? 'heavy' : 'iron'; }
+  if (e.code === 'KeyQ' || e.code === 'Tab') { e.preventDefault(); Game.cycleBall(); }
   if (e.code.startsWith('Arrow')) e.preventDefault();
 });
 window.addEventListener('keyup', e => { Game.keys[e.code] = false; });

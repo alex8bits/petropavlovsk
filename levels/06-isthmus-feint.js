@@ -12,7 +12,7 @@ Levels.add({
     'и подходят вторым заходом. Не тратьте порох на дальние промахи.',
 
   config: {
-    powderStore: { start: 60, capacity: 70, resupplyEvery: 5 },
+    powderStore: { start: 60 },
   },
 
   fleet: [

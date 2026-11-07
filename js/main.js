@@ -11,7 +11,8 @@ const Game = {
   onEnd: null,   // вызывается с итогами боя, когда бой кончился и прошла пауза endDelay
   endDelay: 2.5, // с: дать досмотреть, как тонет последний корабль
   time: 0,
-  ground: null, fortress: [], cannon: null, fortGuns: [], ships: [], balls: [], looseBricks: [],
+  ground: null, rampart: null, fortress: [], cannon: null, fortGuns: [], ships: [], balls: [], looseBricks: [],
+  ammo: {},      // запас покупных ядер на этот бой: тип → штук (чугунное — без счёта)
   spawnIndex: 0, sunk: 0, impacts: [], message: '',
   keys: {},
 
@@ -32,7 +33,7 @@ const Game = {
     this.onEnd = null;
     Physics.world = null;
     Particles.list = [];
-    this.ground = null; this.cannon = null;
+    this.ground = null; this.cannon = null; this.rampart = null; this.ammo = {};
     this.fortress = []; this.fortGuns = []; this.ships = []; this.balls = []; this.impacts = [];
     this.keys = {};
   },
@@ -47,6 +48,8 @@ const Game = {
     this.impacts = [];
     this.spawnIndex = 0;
     this.sunk = 0;
+    this.sunkTypes = {};   // потоплено по типам кораблей — для награды в казну
+    this.ammo = { ...CFG.ammo };
     this.escaped = 0;      // кораблей, ушедших живыми (запись эскадры с leaveAt)
     this.endTimer = 0;
     this.endReported = false;
@@ -57,6 +60,7 @@ const Game = {
     this.powderTimer = 0;                  // сколько прошло с последнего подвоза
     this.ground = Entities.createGround();
     this.fortress = Entities.createFortress(this.ground);
+    this.rampart = Entities.createRampart();
     this.cannon = Entities.createPlayerCannon();
     this.fortGuns = Entities.fortGunSpots.map(p => Entities.createFortGun(p.x, p.y));
     Physics.world.on('begin-contact', c => this.onContact(c));
@@ -85,7 +89,7 @@ const Game = {
   // ядро пушки крепости — кладку крепости и наши пушки (ствол торчит над зубцами)
   ownHit(ball, ud) {
     if (!ud) return false;
-    if (ball.fromFort) return (ud.kind === 'brick' && ud.owner === 'fortress') || ud.kind === 'fortGun' || ud.kind === 'cannon';
+    if (ball.fromFort) return (ud.kind === 'brick' && ud.owner === 'fortress') || ud.kind === 'fortGun' || ud.kind === 'cannon' || ud.kind === 'rampart';
     return ball.owner !== 'player' && this.shipOf(ud) === ball.owner;
   },
 
@@ -169,6 +173,10 @@ const Game = {
         Particles.debris(x, y, [80, 80, 80], 10);
       } else if (target.kind === 'ground') {
         Particles.debris(x, y, [190, 170, 120], 6);
+      } else if (target.kind === 'rampart') {
+        // Земля принимает ядро: только комья и пыль
+        Particles.debris(x, y, [122, 104, 70], 10);
+        Particles.smoke(x, y, 0, 1, 3);
       }
     }
     this.impacts.length = 0;
@@ -206,7 +214,7 @@ const Game = {
       ball.fromFort = true;
       gun.recoil = 1;
       gun.aimPending = null;
-      gun.reload = CFG.balls.iron.reload * F.reloadMul;
+      gun.reload = F.reload;
       return;
     }
     if (gun.reload > 0) return;
@@ -324,17 +332,19 @@ const Game = {
     ship.hp = 0;
     ship.deadTime = 0;
     this.sunk++;
+    this.sunkTypes[ship.type] = (this.sunkTypes[ship.type] || 0) + 1;
     // Надстройка разваливается
     for (const br of ship.bricks) for (const j of [...br.joints]) if (Math.random() < 0.5) Physics.breakJoint(j);
   },
 
   // ---------- Стрельба ----------
-  fireBall(owner, typeKey, x, y, angle, powder) {
+  // acc — множители разброса { angle, speed } (у пушки игрока — от прокачки точности)
+  fireBall(owner, typeKey, x, y, angle, powder, acc = { angle: 1, speed: 1 }) {
     const B = CFG.balls[typeKey];
     // Разброс: ядро неровное, порох горит неодинаково. Сумма двух случайных — чаще ближе к центру.
     const r = () => Math.random() + Math.random() - 1; // от -1 до 1
-    angle += r() * B.spread * Math.PI / 180;
-    const v = CFG.powderSpeed[powder] * B.speedMul * (1 + r() * B.speedSpread);
+    angle += r() * B.spread * acc.angle * Math.PI / 180;
+    const v = CFG.powderSpeed[powder] * B.speedMul * (1 + r() * B.speedSpread * acc.speed);
     const dx = Math.cos(angle), dy = Math.sin(angle);
     const ball = Entities.createBall(typeKey, owner, x, y, dx * v, dy * v);
     this.balls.push(ball);
@@ -355,17 +365,45 @@ const Game = {
     return this.powder >= this.cannon.powder;
   },
 
+  // Разброс пушки игрока: прокачка задаёт его для чугунного ядра, остальные — в той же пропорции
+  playerAccuracy() {
+    const pc = CFG.playerCannon, I = CFG.balls.iron;
+    return { angle: pc.spread / I.spread, speed: pc.speedSpread / I.speedSpread };
+  },
+
+  // Сколько ядер этого типа можно выпустить (Infinity — чугунное)
+  ammoLeft(type) {
+    return type === 'iron' ? Infinity : this.ammo[type] || 0;
+  },
+
+  // Типы ядер, которыми можно стрелять сейчас: чугунное и покупные, пока не кончились
+  ballTypes() {
+    return ['iron', ...Object.keys(AMMO).filter(t => this.ammoLeft(t) > 0)];
+  },
+
+  // Следующий тип ядра (Q): по кругу среди доступных
+  cycleBall() {
+    const list = this.ballTypes(), c = this.cannon;
+    c.ballType = list[(list.indexOf(c.ballType) + 1) % list.length];
+  },
+
   playerFire() {
     const c = this.cannon;
     if (this.state !== 'play' || c.reload > 0 || c.hp <= 0) return;
     if (!this.canAffordShot()) return; // мало пороха — не стреляем, заряд не урезаем
+    if (this.ammoLeft(c.ballType) <= 0) c.ballType = 'iron';
     this.powder -= c.powder;
     this.powderSpent += c.powder;
     this.shots++;
     const a = c.angle * Math.PI / 180;
     const L = CFG.playerCannon.barrelLength;
-    this.fireBall('player', c.ballType, c.pivot.x + Math.cos(a) * L, c.pivot.y + Math.sin(a) * L, a, c.powder);
-    c.reload = CFG.balls[c.ballType].reload;
+    const type = c.ballType;
+    this.fireBall('player', type, c.pivot.x + Math.cos(a) * L, c.pivot.y + Math.sin(a) * L, a, c.powder, this.playerAccuracy());
+    if (type !== 'iron') {
+      this.ammo[type]--;
+      if (this.ammo[type] <= 0) c.ballType = 'iron'; // кончились — дальше чугунными
+    }
+    c.reload = CFG.balls[type].reload;
     c.recoil = 1;
   },
 
@@ -676,7 +714,7 @@ const Game = {
     const integrity = this.fortressIntegrity();
     return {
       win, message: this.message,
-      sunk: this.sunk, total: CFG.fleet.length,
+      sunk: this.sunk, total: CFG.fleet.length, sunkTypes: { ...this.sunkTypes },
       shots: this.shots, hits: this.hits,
       accuracy: this.shots ? this.hits / this.shots : 0,
       powderSpent: this.powderSpent, integrity, time: this.time,

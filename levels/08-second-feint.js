@@ -12,7 +12,7 @@ Levels.add({
     'рассчитывайте порох.',
 
   config: {
-    powderStore: { start: 70, capacity: 80, resupplyEvery: 5 },
+    powderStore: { start: 70 },
   },
 
   fleet: [

@@ -13,7 +13,7 @@ Levels.add({
     'выбивайте пушки и топите корабли по одному.',
 
   config: {
-    powderStore: { start: 90, capacity: 100, resupplyEvery: 4.5 },
+    powderStore: { start: 90 },
   },
 
   fleet: [

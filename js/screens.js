@@ -87,6 +87,40 @@ function mapSvg(nextLevel) {
     </svg>`;
 }
 
+const rub = n => `${n.toLocaleString('ru-RU')} руб.`;
+const treasuryHtml = () => `<span class="treasury" title="Казна">${rub(Profile.data.treasury)}</span>`;
+
+// Одно улучшение в мастерской: значение сейчас → после покупки, деления уровней, кнопка с ценой
+function upgradeRow(key) {
+  const up = UPGRADES[key], st = Profile.upgradeStatus(key);
+  const pips = Array.from({ length: up.maxLevel }, (_, i) => `<span class="pip${i < st.lvl ? ' on' : ''}"></span>`).join('');
+  const now = up.value(st.lvl);
+  const next = st.lvl < up.maxLevel ? up.value(st.lvl + 1) : null;
+  const btn = next
+    ? `<button class="buy${st.ok ? ' primary' : ''}" ${st.ok ? `data-act="buyUpgrade" data-key="${key}"` : 'disabled'}>${rub(st.price)}</button>`
+    : '<span class="maxed">максимум</span>';
+  return `
+    <div class="upg">
+      <div class="upg-head"><b>${esc(up.name)}</b><span class="pips">${pips}</span></div>
+      <div class="upg-val">${esc(now)}${next ? ` <span class="arrow">→</span> <span class="next">${esc(next)}</span>` : ''}</div>
+      <small>${esc(up.hint)}</small>
+      <div class="upg-buy">${btn}${next && !st.ok ? `<small class="why">${esc(st.reason)}</small>` : ''}</div>
+    </div>`;
+}
+
+function ammoRow(type) {
+  const A = AMMO[type], B = BASE_CFG.balls[type], st = Profile.ammoStatus(type);
+  const btn = st.packs < A.maxPacks
+    ? `<button class="buy${st.ok ? ' primary' : ''}" ${st.ok ? `data-act="buyAmmo" data-type="${type}"` : 'disabled'}>+${A.pack} за ${rub(A.price)}</button>`
+    : '<span class="maxed">максимум</span>';
+  return `
+    <div class="upg">
+      <div class="upg-head"><b>${esc(B.name)} ядро</b><span class="ammo-have">${st.have} шт. на каждый бой</span></div>
+      <small>${esc(A.hint)}. Купленное остаётся: каждый бой начинается с полным запасом</small>
+      <div class="upg-buy">${btn}${st.packs < A.maxPacks && !st.ok ? `<small class="why">${esc(st.reason)}</small>` : ''}</div>
+    </div>`;
+}
+
 // Следующий бой, который стоит сыграть: первый открытый и ещё не выигранный
 function nextToPlay() {
   return Levels.list.find(l => Profile.isUnlocked(l) && !Profile.levelRecord(l.id).won) || null;
@@ -144,7 +178,7 @@ const Screens = {
       <div class="panel campaign">
         <div class="head">
           <h2>Кампания</h2>
-          <span class="total">${starsHtml([true], 'one')} ${Profile.totalStars()} из ${Levels.list.length * 3}</span>
+          <span class="total">${treasuryHtml()} · ${starsHtml([true], 'one')} ${Profile.totalStars()} из ${Levels.list.length * 3}</span>
         </div>
         ${done ? '<p class="win-note">Кампания пройдена: эскадра ушла из Авачинской губы. Бои можно переигрывать ради звёзд.</p>' : ''}
         <div class="campaign-body">
@@ -153,7 +187,7 @@ const Screens = {
         </div>
         <div class="row">
           ${next ? `<button class="primary" data-act="briefing" data-id="${esc(next.id)}">Бой ${next.n}: ${esc(next.title)}</button>` : ''}
-          <button disabled title="Появится на этапе «Мастерская»">Мастерская</button>
+          <button data-act="workshop">Мастерская</button>
           <button data-act="menu">В меню</button>
         </div>
       </div>`;
@@ -163,7 +197,14 @@ const Screens = {
     const rec = Profile.levelRecord(level.id), bat = Levels.batteryOf(level);
     const cfg = Levels.buildConfig(level, Profile.data);
     const fog = cfg.weather.fog, PS = cfg.powderStore;
-    const support = cfg.fortGuns.count;
+    const support = cfg.fortGuns.count, slots = Levels.buildConfig(level, Profile.maxed()).fortGuns.count;
+    const spotChoice = support === 1 && slots === 2;
+    const ammo = Object.entries(cfg.ammo).filter(([, n]) => n > 0)
+      .map(([t, n]) => `${esc(cfg.balls[t].name.toLowerCase())} — ${n} шт.`).join(', ');
+    const supportText = support
+      ? `${support} ${plural(support, 'пушка', 'пушки', 'пушек')} на крепости` +
+        (spotChoice ? `: <span class="seg">${['wall', 'tower'].map(k => `<button class="${cfg.fortGuns.spot === k ? 'on' : ''}" data-act="fortSpot" data-spot="${k}" data-id="${esc(level.id)}">${k === 'wall' ? 'на стене' : 'на башне'}</button>`).join('')}</span>` : '')
+      : slots ? `нет — купите в мастерской (на батарее ${slots} ${plural(slots, 'место', 'места', 'мест')})` : 'нет — стреляете только вы';
     return `
       <div class="panel wide">
         <p class="sub">Глава ${level.chapter} · бой ${level.n} · ${esc(level.date || '')}</p>
@@ -173,14 +214,49 @@ const Screens = {
         <dl>
           <dt>Батарея</dt><dd>${esc(bat.name)} — ${esc(bat.place)}. Командир — ${esc(bat.commander)}; ${esc(bat.guns)}</dd>
           <dt>Эскадра</dt><dd>${fleetHtml(level)}</dd>
-          <dt>Поддержка</dt><dd>${support ? `${support} ${plural(support, 'пушка', 'пушки', 'пушек')} на крепости` : 'нет — стреляете только вы'}</dd>
-          <dt>Порох</dt><dd>${PS.start} ${plural(PS.start, 'мешок', 'мешка', 'мешков')} на складе (вмещает ${PS.capacity}), подвоз — мешок за ${String(PS.resupplyEvery).replace('.', ',')} с</dd>
+          <dt>Поддержка</dt><dd>${supportText}</dd>
+          <dt>Порох</dt><dd>${PS.start} ${plural(PS.start, 'мешок', 'мешка', 'мешков')} ${PS.start > PS.capacity ? `завезено заранее (склад вмещает ${PS.capacity})` : `на складе (вмещает ${PS.capacity})`}, подвоз — мешок за ${String(PS.resupplyEvery).replace('.', ',')} с</dd>
+          <dt>Ядра</dt><dd>чугунные без счёта${ammo ? `; ${ammo}` : ''}</dd>
+          ${cfg.rampart.level ? `<dt>Вал</dt><dd>${esc(UPGRADES.rampart.value(cfg.rampart.level))} перед стеной</dd>` : ''}
           ${fog ? `<dt>Погода</dt><dd>туман и волнение</dd>` : ''}
         </dl>
         <ul class="conds">${starConditions(level).map((c, i) => `<li>${starsHtml([rec.stars[i]], 'one')} ${c}</li>`).join('')}</ul>
         <div class="row">
           <button class="primary" data-act="start" data-id="${esc(level.id)}">В бой</button>
+          <button data-act="workshop" data-id="${esc(level.id)}">Мастерская</button>
           <button data-act="map">На карту</button>
+        </div>
+      </div>`;
+  },
+
+  // Мастерская: казна, четыре ветки улучшений и покупка ядер. back — id боя, к брифингу которого вернуться
+  workshop({ back } = {}) {
+    const branches = BRANCHES.map(b => `
+      <section class="branch">
+        <h3>${esc(b.name)}</h3>
+        <p class="note">${esc(b.note)}</p>
+        ${Object.keys(UPGRADES).filter(k => UPGRADES[k].branch === b.key).map(upgradeRow).join('')}
+      </section>`).join('');
+    const backLevel = back && Levels.get(back);
+    return `
+      <div class="panel workshop">
+        <div class="head">
+          <h2>Мастерская</h2>
+          <span class="total">${treasuryHtml()} · ${starsHtml([true], 'one')} ${Profile.totalStars()}</span>
+        </div>
+        <p class="sub">Казну дают потопленные корабли и новые звёзды. Звёзды не тратятся: старшие уровни открываются
+          по их числу (${UPGRADE_STARS.slice(3).map((n, i) => `${i + 3}-й — ${n} ★`).join(', ')}). Ничего не чинится между боями:
+          каждый бой начинается с целой крепостью и полным запасом купленных ядер.</p>
+        <div class="branches">${branches}
+          <section class="branch">
+            <h3>Ядра</h3>
+            <p class="note">Чугунное — без счёта, покупные — пачками</p>
+            ${Object.keys(AMMO).map(ammoRow).join('')}
+          </section>
+        </div>
+        <div class="row">
+          ${backLevel ? `<button class="primary" data-act="briefing" data-id="${esc(backLevel.id)}">К бою ${backLevel.n}: ${esc(backLevel.title)}</button>` : ''}
+          <button class="${backLevel ? '' : 'primary'}" data-act="map">На карту</button>
         </div>
       </div>`;
   },
@@ -199,7 +275,7 @@ const Screens = {
   },
 
   // unlocked — бой, который открылся этой победой (или null); missing — сколько звёзд не хватает до главы
-  results({ level, res, record, unlocked, finished }) {
+  results({ level, res, record, reward, unlocked, finished }) {
     const next = Levels.next(level);
     const conds = starConditions(level);
     const missing = next && !unlocked && record.won ? Profile.starsMissing(next) : 0;
@@ -221,11 +297,16 @@ const Screens = {
           <dt>Порох</dt><dd>${res.powderSpent} ${plural(res.powderSpent, 'мешок', 'мешка', 'мешков')}</dd>
           <dt>Точность</dt><dd>${res.shots ? `${Math.round(res.accuracy * 100)}% (${res.hits} из ${res.shots})` : 'не стреляли'}</dd>
           <dt>Время</dt><dd>${fmtTime(res.time)}</dd>
+          <dt>Казна</dt><dd class="reward">+${rub(reward.total)} <small>(${[
+            `за корабли ${rub(reward.ships)}`,
+            reward.newStars ? `за ${reward.newStars} ${plural(reward.newStars, 'новую звезду', 'новые звезды', 'новых звёзд')} ${rub(reward.stars)}` : 'новых звёзд нет',
+          ].join(', ')})</small> · всего ${rub(Profile.data.treasury)}</dd>
         </dl>
         ${record.won ? `<p class="note">Звёзды за все попытки:${starsHtml(record.stars, 'one')}</p>` : ''}
         <div class="row">
           ${canNext ? `<button class="primary" data-act="briefing" data-id="${esc(next.id)}">Следующий бой</button>` : ''}
           <button class="${canNext ? '' : 'primary'}" data-act="start" data-id="${esc(level.id)}">Ещё раз</button>
+          <button data-act="workshop" data-id="${esc((canNext ? next : level).id)}">Мастерская</button>
           <button data-act="map">На карту</button>
         </div>
       </div>`;

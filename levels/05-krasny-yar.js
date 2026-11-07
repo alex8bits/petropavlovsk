@@ -9,17 +9,19 @@ Levels.add({
   history: 'Кладбищенскую батарею мичмана Попова — три 24-фунтовые пушки — подавили в первый штурм. ' +
     'У неё высадились около 600 французов, но отошли к шлюпкам, не приняв штыкового боя.',
   briefing: 'Батарея стоит высоко: ядро летит сверху вниз, и далеко бить можно малым зарядом. ' +
-    'Пороха на складе мало, подвоз медленный. Тяжёлое ядро (Q) бьёт сильнее, но заряжается дольше.',
+    'Пороха на складе мало. На батарею выдали девять тяжёлых ядер (Q): они бьют сильнее, но заряжаются дольше. ' +
+    'Ещё тяжёлых можно купить в мастерской.',
 
   config: {
-    powderStore: { start: 55, capacity: 60, resupplyEvery: 5.5 },
+    powderStore: { start: 55 },
+    ammo: { heavy: 9 },
   },
 
   fleet: [
     { t: 1,  type: 'sloop',   stopX: 30, name: 'Virago' },
     { t: 12, type: 'frigate', stopX: 27, name: 'President' },
-    { t: 30, type: 'frigate', stopX: 33, name: 'Forte', flag: 'france' },
-    { t: 48, type: 'frigate', stopX: 36, name: 'Pique' },
+    { t: 36, type: 'frigate', stopX: 33, name: 'Forte', flag: 'france' },
+    { t: 60, type: 'frigate', stopX: 36, name: 'Pique' },
   ],
 
   win: 'sinkAll',

@@ -12,16 +12,22 @@ Levels.add({
     'выбивайте пушки ближних кораблей, пока они не разобрали кладку.',
 
   config: {
-    powderStore: { start: 90, capacity: 100, resupplyEvery: 4.5 },
+    powderStore: { start: 90 },
+    // Шесть кораблей без пушек поддержки (нулевая прокачка) разбирают кладку слишком быстро:
+    // эскадра стреляет реже обычного
+    ships: {
+      frigate: { fireDelay: [5.8, 8.0] },
+      sloop: { fireDelay: [5.2, 7.4] },
+    },
   },
 
   fleet: [
     { t: 1,  type: 'sloop',   stopX: 32, name: 'Virago' },
     { t: 8,  type: 'frigate', stopX: 27, name: 'President' },
-    { t: 22, type: 'sloop',   stopX: 37, name: 'Obligado', flag: 'france' },
-    { t: 38, type: 'frigate', stopX: 30, name: 'Forte', flag: 'france' },
-    { t: 56, type: 'sloop',   stopX: 35, name: 'Eurydice', flag: 'france', hpMul: 1.3 },
-    { t: 72, type: 'frigate', stopX: 33, name: 'Pique' },
+    { t: 26, type: 'sloop',   stopX: 37, name: 'Obligado', flag: 'france' },
+    { t: 46, type: 'frigate', stopX: 30, name: 'Forte', flag: 'france' },
+    { t: 68, type: 'sloop',   stopX: 35, name: 'Eurydice', flag: 'france' },
+    { t: 88, type: 'frigate', stopX: 33, name: 'Pique' },
   ],
 
   win: 'sinkAll',

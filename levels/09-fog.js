@@ -12,7 +12,7 @@ Levels.add({
     'ловите момент, когда корабль на гребне.',
 
   config: {
-    powderStore: { start: 55, capacity: 70, resupplyEvery: 5 },
+    powderStore: { start: 55 },
     weather: { fog: 0.8 },
     water: { waves: [[0.45, 11, 1.8], [0.2, 5.3, -1.3], [0.08, 2.1, 2.5]] },
   },
