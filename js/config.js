@@ -129,7 +129,7 @@ const BASE_CFG = {
     // Парусно-паровой шлюп (как Virago): мачта и гребное колесо посередине борта, труба над колесом.
     // Колесо — отдельная мишень (wheelHp); потеря мачты или колеса — минус треть скорости каждое.
     steamer: {
-      name: 'Пароход', hp: 260, scale: 0.72, hullDensity: 1.2,
+      name: 'Пароход', hp: 286, scale: 0.72, hullDensity: 1.2,
       speed: 1.0, fireDelay: [4.5, 6.5], aimError: 1.5,
       cannons: [-2.4], mastX: -1.1, mastHeight: 5, cabinCols: 3, cabinRows: 2,
       wheel: { x: 0.3, r: 0.75 }, funnel: { x: 0.3, h: 1.7, w: 0.32 },
