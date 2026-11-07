@@ -27,18 +27,66 @@ const Render = {
     resize();
     for (let i = 0; i < 6; i++) this.clouds.push({ x: Math.random() * 60, y: 14 + Math.random() * 6, w: 3 + Math.random() * 4, sp: 0.2 + Math.random() * 0.3 });
     canvas.addEventListener('click', e => this.onClick(e));
+    // Касания: протяжка по полю — угол, зажатые ▲ ▼ — как клавиши ↑ ↓
+    this.touch = !!(window.matchMedia && matchMedia('(any-pointer: coarse)').matches);
+    canvas.addEventListener('pointerdown', e => this.onPointerDown(e));
+    canvas.addEventListener('pointermove', e => this.onPointerMove(e));
+    for (const t of ['pointerup', 'pointercancel']) canvas.addEventListener(t, e => this.onPointerUp(e));
   },
 
   // мир → экран
   X(x) { return x * this.s; },
   Y(y) { return (CFG.world.bottom + CFG.world.height - y) * this.s; },
 
-  onClick(e) {
+  // Точка события → пиксели канваса и кнопка под ней из списка
+  hitTest(e, list) {
     const r = this.canvas.getBoundingClientRect();
     const x = (e.clientX - r.left) * this.dpr, y = (e.clientY - r.top) * this.dpr;
-    for (const b of this.buttons) {
-      if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { b.fn(); return; }
+    return list.find(b => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) || null;
+  },
+
+  onClick(e) {
+    const b = this.hitTest(e, this.buttons);
+    if (b) b.fn();
+  },
+
+  // ---------- Касания ----------
+  AIM_PX_PER_DEG: 8, // протяжка пальцем: CSS-пикселей на градус ствола
+  holds: [],         // кнопки ▲ ▼ (рисуются только на сенсорном экране)
+  pointers: new Map(), // pointerId → { key } (зажата ▲/▼) или { lastY } (наводка протяжкой)
+
+  aiming() { return App.screen === 'battle' && Game.active && !Game.paused && Game.state === 'play'; },
+
+  onPointerDown(e) {
+    if (e.pointerType !== 'mouse') this.touch = true;
+    if (!this.aiming()) return;
+    const h = this.hitTest(e, this.holds);
+    if (h) {
+      Game.keys[h.key] = true;
+      this.pointers.set(e.pointerId, { key: h.key });
+    } else if (e.pointerType === 'mouse' || this.hitTest(e, this.buttons)) {
+      return; // мышь наводит колесом и клавишами, как прежде; кнопки панели срабатывают по click
+    } else {
+      this.pointers.set(e.pointerId, { lastY: e.clientY });
     }
+    try { this.canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  },
+
+  onPointerMove(e) {
+    const p = this.pointers.get(e.pointerId);
+    if (!p || p.key) return;
+    const dy = p.lastY - e.clientY; // вверх — ствол выше
+    p.lastY = e.clientY;
+    if (!this.aiming()) return;
+    const pc = CFG.playerCannon, c = Game.cannon;
+    c.angle = Math.max(pc.minAngle, Math.min(pc.maxAngle, c.angle + dy / this.AIM_PX_PER_DEG));
+  },
+
+  onPointerUp(e) {
+    const p = this.pointers.get(e.pointerId);
+    if (!p) return;
+    if (p.key) Game.keys[p.key] = false;
+    this.pointers.delete(e.pointerId);
   },
 
   // game = null — боя нет (меню и прочие экраны): только берег, небо и вода
@@ -704,6 +752,24 @@ const Render = {
     ctx.fillText('↑↓ / колесо — угол · ←→ — порох', px + 12 * u, py + 113 * u);
     ctx.fillText('Пробел — выстрел · Q — ядро · Esc — пауза', px + 12 * u, py + 129 * u);
 
+    // Сенсорный экран: ▲ ▼ справа от панели, не меньше 40 CSS-пикселей
+    this.holds = [];
+    this.hudRight = px + pw;
+    if (this.touch) {
+      const bs = Math.max(56 * u, 40 * d), bx = px + pw + 8 * u;
+      [['ArrowUp', '▲', py], ['ArrowDown', '▼', py + bs + 6 * u]].forEach(([key, label, by]) => {
+        ctx.fillStyle = game.keys[key] ? '#c99a52' : 'rgba(15, 25, 35, 0.72)';
+        this.roundRect(bx, by, bs, bs, 8 * u); ctx.fill();
+        ctx.fillStyle = game.keys[key] ? '#2a1c0c' : '#fff';
+        ctx.font = `${bs * 0.45}px ${this.FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(label, bx + bs / 2, by + bs / 2);
+        ctx.textAlign = 'left';
+        this.holds.push({ x: bx, y: by, w: bs, h: bs, key });
+      });
+      this.hudRight = bx + bs;
+    }
+
     // Правая панель: состояние
     ctx.font = `${13 * u}px ${this.FONT}`;
     ctx.fillStyle = 'rgba(15, 25, 35, 0.72)';
@@ -771,7 +837,7 @@ const Render = {
       }
     }
     // Плашка: в промежутке между левой и правой панелями
-    const left = 324 * u, right = W - 274 * u, bw = Math.min(560 * u, right - left), bx = (left + right - bw) / 2, by = 12 * u;
+    const left = Math.max(324 * u, this.hudRight + 12 * u), right = W - 274 * u, bw = Math.min(560 * u, right - left), bx = (left + right - bw) / 2, by = 12 * u;
     ctx.font = `${15 * u}px ${this.FONT}`;
     const lines = this.wrap(h.text, bw - 28 * u);
     const bh = 34 * u + lines.length * 21 * u;
