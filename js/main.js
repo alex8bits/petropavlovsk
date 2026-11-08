@@ -828,7 +828,8 @@ const Game = {
     }
     const total = s.cabinBricks.length;
     const intact = s.cabinBricks.filter(b => !this.brickLost(s, b)).length;
-    s.crew = Math.max(CFG.ships.crewMin, total ? intact / total : 1);
+    const C = CFG.ships.crewMin; // без рубки работают уцелевшие с палубы: доля команды не ниже crewMin
+    s.crew = total ? C + (1 - C) * intact / total : 1;
   },
 
   // Вода в трюме: заливается через борт, ушедший под воду, команда её откачивает.
