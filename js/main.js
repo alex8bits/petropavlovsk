@@ -242,7 +242,7 @@ const Game = {
     Particles.blast(x, y);
   },
 
-  // Осколки: по CFG.blast.shardAngles вправо и столько же влево, квадратики массой shardMass × массы бомбы.
+  // Осколки: по одному на каждый угол CFG.blast.shardAngles вправо и столько же влево, квадратики массой shardMass × массы бомбы.
   // Это ядра типа shard — бьют всё, во что попадут, как обычные (в точность игрока не идут)
   shards(bomb, x, y, mass) {
     const X = CFG.blast, B = CFG.balls.shard;
