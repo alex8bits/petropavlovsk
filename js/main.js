@@ -204,11 +204,11 @@ const Game = {
   explode(ball) {
     const X = CFG.blast, R = X.radius, bp = ball.body.getPosition(), x = bp.x, y = bp.y;
     const mass = ball.body.getMass();
-    // Под водой (не в трюме): осколков нет — вода их гасит, зато столб брызг
+    // Под водой (не в трюме): осколки медленнее (вода тормозит) и столб брызг
     const surf = Physics.waterY(x), under = y < surf && !this.insideHull({ x, y });
     ball.alive = false; ball.fuse = false;
     Physics.world.destroyBody(ball.body);
-    if (!under) this.shards(ball, x, y, mass);
+    this.shards(ball, x, y, mass, under);
     const share = d => Math.max(0, 1 - d / R);
     let hurt = false;
     for (const s of this.ships) {
@@ -254,14 +254,15 @@ const Game = {
 
   // Осколки: по одному на каждый угол CFG.blast.shardAngles вправо и столько же влево, квадратики массой shardMass × массы бомбы.
   // Это ядра типа shard — бьют всё, во что попадут, как обычные (в точность игрока не идут)
-  shards(bomb, x, y, mass) {
-    const X = CFG.blast, B = CFG.balls.shard;
+  shards(bomb, x, y, mass, under) {
+    const X = CFG.blast, B = CFG.balls.shard, v = X.shardSpeed * (under ? X.shardSpeedWater : 1);
     for (const side of [1, -1]) for (const deg of X.shardAngles) {
       const a = deg * Math.PI / 180, dx = side * Math.cos(a), dy = Math.sin(a);
       const off = bomb.B.radius + B.radius;
-      const s = Entities.createBall('shard', bomb.owner, x + dx * off, y + dy * off, dx * X.shardSpeed, dy * X.shardSpeed,
+      const s = Entities.createBall('shard', bomb.owner, x + dx * off, y + dy * off, dx * v, dy * v,
         { mass: mass * X.shardMass });
       s.fromFort = bomb.fromFort;
+      if (under) { s.inWater = s.wasWet = true; s.hits = 2; } // уже в воде: без всплеска на вылете, бьёт слабее
       this.balls.push(s);
     }
   },
