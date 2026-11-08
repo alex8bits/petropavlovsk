@@ -182,7 +182,11 @@ const Game = {
         if (target.hp <= 0) this.breakWheel(target, x, y);
       } else if (target.kind === 'hull' && target.alive) {
         target.hp -= energy * CFG.ships.damagePerJoule * ball.B.hullDamage;
-        if (ball.B.shard && Math.random() < CFG.flood.leak.chance) this.holeHull(target, x, y);
+        // Пробоина — один бросок на взрыв и корабль: решает первый осколок, попавший в корпус
+        if (ball.B.shard && ball.burst && !ball.burst.rolled.has(target)) {
+          ball.burst.rolled.add(target);
+          if (Math.random() < CFG.flood.leak.chance) this.holeHull(target, x, y);
+        }
         this.shockwave(x, y, energy * 0.7);
         Particles.debris(x, y, CFG.brick.wood.color, 10);
         if (target.hp <= 0) this.killShip(target);
@@ -262,12 +266,14 @@ const Game = {
   // Это ядра типа shard — бьют всё, во что попадут, как обычные (в точность игрока не идут)
   shards(bomb, x, y, mass, under) {
     const X = CFG.blast, B = CFG.balls.shard, v = X.shardSpeed * (under ? X.shardSpeedWater : 1);
+    const burst = { rolled: new Set() }; // общий для осколков одного взрыва (пробоина — один бросок на корабль)
     for (const side of [1, -1]) for (const deg of X.shardAngles) {
       const a = deg * Math.PI / 180, dx = side * Math.cos(a), dy = Math.sin(a);
       const off = bomb.B.radius + B.radius;
       const s = Entities.createBall('shard', bomb.owner, x + dx * off, y + dy * off, dx * v, dy * v,
         { mass: mass * X.shardMass });
       s.fromFort = bomb.fromFort;
+      s.burst = burst;
       if (under) { s.inWater = s.wasWet = true; s.hits = 2; } // уже в воде: без всплеска на вылете, бьёт слабее
       this.balls.push(s);
     }
