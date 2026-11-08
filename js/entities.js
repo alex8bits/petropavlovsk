@@ -248,7 +248,7 @@ const Entities = {
     body.setLinearVelocity(V(vx, vy));
     // heat — накал калёного ядра (1 — из печи, 0 — остыло; у остальных всегда 0)
     const ball = { kind: 'ball', type: typeKey, B, owner, body, hits: 0, age: 0, inWater: false, alive: true, heat: B.ignite ? 1 : 0,
-      fuse: !!B.explosive }; // fuse — бомба ещё может взорваться (в воде гаснет)
+      fuse: !!B.explosive }; // fuse — бомба ещё может взорваться; fuseTimer — подожжена ударом
     body.setUserData(ball);
     return ball;
   },
@@ -285,6 +285,21 @@ const Particles = {
     for (let i = 0; i < 4; i++) {
       this.spawn({ type: 'smoke', x, y, vx: (Math.random() - 0.5) * 1.5, vy: Math.random(), g: 0.3,
         size: 0.2 + Math.random() * 0.3, life: 0.8 + Math.random() * 0.6, max: 1.4, color: [180, 170, 155] });
+    }
+  },
+  // Подводный взрыв бомбы на глубине depth под поверхностью y: столб воды и пена — выше и шире, чем от падения ядра
+  waterBlast(x, y, depth) {
+    const k = Math.max(0.5, 1 - depth / 3); // чем глубже, тем ниже столб
+    for (let i = 0; i < 160; i++) {
+      const spread = (Math.random() - 0.5) * 2;
+      this.spawn({ type: 'drop', x: x + spread * 0.8, y, vx: spread * 2.5 + (Math.random() - 0.5) * 1.5,
+        vy: (7 + Math.random() * 7) * k * (1 - Math.abs(spread) * 0.45), size: 0.1 + Math.random() * 0.18,
+        life: 1.6 + Math.random() * 1.0, max: 2.6, color: [220, 240, 255] });
+    }
+    // Белая пена и водяная пыль над столбом
+    for (let i = 0; i < 24; i++) {
+      this.spawn({ type: 'smoke', x: x + (Math.random() - 0.5) * 1.6, y: y + Math.random() * 3 * k, vx: (Math.random() - 0.5) * 1.2,
+        vy: 1 + Math.random() * 3 * k, g: 0.4, size: 0.35 + Math.random() * 0.5, life: 1.4 + Math.random(), max: 2.4, color: [235, 242, 248] });
     }
   },
   // Взрыв бомбы: вспышка огня, искры-осколки во все стороны, клуб тёмного дыма

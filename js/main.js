@@ -136,8 +136,10 @@ const Game = {
     // Каждый следующий отскок наносит меньше урона
     const hitFactor = Math.pow(0.5, ball.hits);
     ball.hits++;
-    // Бомба: первый удар (не о воду) поджигает трубку — взрыв через CFG.blast.delay (в Game.step)
-    if (ball.fuse && ball.fuseTimer == null) ball.fuseTimer = CFG.blast.delay;
+    // Бомба: удар поджигает трубку — взрыв через CFG.blast.delay (в Game.step), даже если потом упадёт в воду.
+    // Упавшая сперва в воду рвётся только от удара о корабль (о дно и берег под водой — нет)
+    if (ball.fuse && ball.fuseTimer == null && (!ball.wasWet || (other && (this.shipOf(other) || other.ship))))
+      ball.fuseTimer = CFG.blast.delay;
     if (rel < CFG.brick.minImpactSpeed || !other) return;
     const energy = 0.5 * ball.body.getMass() * rel * rel * hitFactor;
     this.impacts.push({ ball, target: other, energy, x: pt.x, y: pt.y });
@@ -202,9 +204,11 @@ const Game = {
   explode(ball) {
     const X = CFG.blast, R = X.radius, bp = ball.body.getPosition(), x = bp.x, y = bp.y;
     const mass = ball.body.getMass();
+    // Под водой (не в трюме): осколков нет — вода их гасит, зато столб брызг
+    const surf = Physics.waterY(x), under = y < surf && !this.insideHull({ x, y });
     ball.alive = false; ball.fuse = false;
     Physics.world.destroyBody(ball.body);
-    this.shards(ball, x, y, mass);
+    if (!under) this.shards(ball, x, y, mass);
     const share = d => Math.max(0, 1 - d / R);
     let hurt = false;
     for (const s of this.ships) {
@@ -238,8 +242,14 @@ const Game = {
       br.body.applyLinearImpulse(V(n.x * X.impulse * k, (n.y + 0.3) * X.impulse * k), p, true);
       this.damageBrick(br, X.brick * k);
     }
-    Sound.event('blast', { x, power: 1 });
-    Particles.blast(x, y);
+    if (under) {
+      Particles.waterBlast(x, surf, surf - y);
+      Sound.event('blast', { x, power: 0.7 });
+      Sound.event('splash', { x, power: 1 });
+    } else {
+      Sound.event('blast', { x, power: 1 });
+      Particles.blast(x, y);
+    }
   },
 
   // Осколки: по одному на каждый угол CFG.blast.shardAngles вправо и столько же влево, квадратики массой shardMass × массы бомбы.
@@ -254,6 +264,11 @@ const Game = {
       s.fromFort = bomb.fromFort;
       this.balls.push(s);
     }
+  },
+
+  // Видна ли горящая трубка: подожжена ударом или ещё не бывала в воде; под водой искры не видно
+  fuseVisible(b) {
+    return b.fuse && !b.inWater && (b.fuseTimer != null || !b.wasWet);
   },
 
   // Расстояние от точки до фигур тела (по их AABB), 0 — внутри
@@ -760,7 +775,6 @@ const Game = {
         Particles.splash(p.x, surf, Math.abs(v.y));
         Sound.event('splash', { x: p.x, power: Math.abs(v.y) / 14 });
         if (b.heat > 0) { b.heat = 0; Particles.smoke(p.x, surf, 0, 1, 5); } // калёное шипит и гаснет
-        b.fuse = false; // бомба в воде гаснет и тонет, не взорвавшись
       }
       if (b.heat > 0) {
         b.heat = Math.max(0, b.heat - dt / CFG.fire.heatTime);
@@ -769,7 +783,7 @@ const Game = {
       }
       // Трубка подожжена ударом — бомба рвётся, где окажется через delay (если не упала в воду)
       if (b.fuse && b.fuseTimer != null && (b.fuseTimer -= dt) <= 0) { this.explode(b); continue; }
-      if (b.fuse && Math.random() < dt * 20) Particles.spawn({ type: 'spark', x: p.x, y: p.y + b.B.radius, vx: (Math.random() - 0.5) * 1.5,
+      if (this.fuseVisible(b) && Math.random() < dt * 20) Particles.spawn({ type: 'spark', x: p.x, y: p.y + b.B.radius, vx: (Math.random() - 0.5) * 1.5,
         vy: 0.5 + Math.random(), g: -4, size: 0.04, life: 0.2, max: 0.2, color: [255, 200, 90] });
       b.inWater = inWater;
       if (inWater) Physics.applyBuoyancySimple(b.body, Math.PI * b.B.radius * b.B.radius, b.B.radius);

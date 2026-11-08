@@ -589,8 +589,8 @@ const Render = {
       return;
     }
     ctx.beginPath(); ctx.arc(this.X(p.x), this.Y(p.y), b.B.radius * this.s, 0, Math.PI * 2); ctx.fill();
-    // Бомба: горящая трубка (пока не погасла в воде) — искра сверху (искры следом — в Game.step)
-    if (b.fuse) {
+    // Бомба: горящая трубка (Game.fuseVisible) — искра сверху (искры следом — в Game.step)
+    if (Game.fuseVisible(b)) {
       const fx = this.X(p.x), fy = this.Y(p.y + b.B.radius * 1.05), r = Math.max(2, 0.06 * this.s) * (0.8 + Math.random() * 0.5);
       ctx.save();
       ctx.fillStyle = 'rgba(255, 200, 90, 0.9)';
