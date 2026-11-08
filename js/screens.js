@@ -116,7 +116,7 @@ function ammoRow(type) {
   return `
     <div class="upg">
       <div class="upg-head"><b>${esc(B.name)} ядро</b><span class="ammo-have">${st.have} шт. на каждый бой</span></div>
-      <small>${esc(A.hint)}. Купленное остаётся: каждый бой начинается с полным запасом</small>
+      <small>${esc(A.hint)}</small>
       <div class="upg-buy">${btn}${st.packs < A.maxPacks && !st.ok ? `<small class="why">${esc(st.reason)}</small>` : ''}</div>
     </div>`;
 }

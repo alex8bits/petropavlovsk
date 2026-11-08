@@ -30,12 +30,12 @@ const Settings = {
 const Sound = {
   ctx: null, master: null, noise: null, amb: null, reverb: null,
   last: {},                       // имя → время последнего запуска (чтобы залп кирпичей не ревел)
-  gap: { stone: 0.06, wood: 0.08, earth: 0.06, splash: 0.07, crash: 0.15, spark: 0.1, empty: 0.25 },
+  gap: { blast: 0.05, stone: 0.06, wood: 0.08, earth: 0.06, splash: 0.07, crash: 0.15, spark: 0.1, empty: 0.25 },
   // Доля эха у звука (посыл в reverb); нет в списке — сухой (интерфейс, подсказки)
   wet: {
     shot: 0.55, enemyShot: 0.7, fortShot: 0.55,
     wood: 0.3, stone: 0.3, earth: 0.25, metal: 0.35, splash: 0.3,
-    crash: 0.35, sink: 0.4, ignite: 0.25, win: 0.3, lose: 0.3,
+    crash: 0.35, blast: 0.65, sink: 0.4, ignite: 0.25, win: 0.3, lose: 0.3,
   },
   edge: { cutoff: 7000, wet: 0.5 }, // у края поля: срез высоких, Гц, и прибавка к доле эха (× wet)
 
@@ -60,6 +60,7 @@ const Sound = {
     wood:      { set: 'wood', gain: p => 0.85 * p, rate: 1 },
     splash:    { set: 'splash', gain: p => 0.7 * p, rate: 1 },
     crash:     { set: 'crash', gain: p => 0.8 * p, rate: 1 },
+    blast:     { set: 'shot', gain: p => 0.55 * p, rate: 0.8, lowpass: 2600 }, // взрыв бомбы — ниже и глуше выстрела
   },
   variation: { rate: 0.06, gain: 0.1 }, // случайный разброс высоты и громкости записи (±доля)
   buffers: {},                          // файл → AudioBuffer (что загрузилось)
@@ -295,6 +296,12 @@ const Sound = {
         this.burst(out, t + dt, { type: 'bandpass', f: 600 + Math.random() * 900, q: 3, gain: 0.5 * p, decay: 0.08 });
       }
       this.tone(out, t, { wave: 'sawtooth', f: 90, f1: 55, gain: 0.12 * p, attack: 0.02, decay: 0.5 });
+    },
+    // Взрыв бомбы: глухой удар, треск осколков
+    blast(out, t, p) {
+      this.burst(out, t, { f: [1400, 160], gain: 0.7 * p, attack: 0.004, decay: 0.9 });
+      this.tone(out, t, { f: 60, f1: 26, gain: 0.9 * p, attack: 0.005, decay: 0.7 });
+      this.burst(out, t + 0.03, { type: 'highpass', f: 2800, gain: 0.2 * p, decay: 0.3 });
     },
     // Корабль уходит под воду: гул и пузыри
     sink(out, t, p) {

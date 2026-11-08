@@ -582,7 +582,21 @@ const Render = {
         ctx.fillStyle = keep;
       }
     }
+    if (b.B.shard) { // осколок — повёрнутый квадратик
+      const h = b.B.radius * this.s;
+      ctx.save(); ctx.translate(this.X(p.x), this.Y(p.y)); ctx.rotate(-b.body.getAngle());
+      ctx.fillRect(-h, -h, 2 * h, 2 * h); ctx.restore();
+      return;
+    }
     ctx.beginPath(); ctx.arc(this.X(p.x), this.Y(p.y), b.B.radius * this.s, 0, Math.PI * 2); ctx.fill();
+    // Бомба: горящая трубка (пока не погасла в воде) — искра сверху (искры следом — в Game.step)
+    if (b.fuse) {
+      const fx = this.X(p.x), fy = this.Y(p.y + b.B.radius * 1.05), r = Math.max(2, 0.06 * this.s) * (0.8 + Math.random() * 0.5);
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 200, 90, 0.9)';
+      ctx.beginPath(); ctx.arc(fx, fy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
     ctx.strokeStyle = 'rgba(255,255,255,0.45)';
     ctx.lineWidth = Math.max(1, 0.025 * this.s);
     ctx.stroke();

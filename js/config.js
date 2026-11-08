@@ -57,6 +57,11 @@ const BASE_CFG = {
     heavy: { name: 'Тяжёлое',  radius: 0.23, density: 20, damage: 1.0, hullDamage: 1.0, speedMul: 0.85, spread: 1.0, speedSpread: 0.03, reload: 3.5, color: '#4a3a2a' },
     // Калёное: раскалено в печи (ignite) — поджигает деревянный корабль; греется дольше, чем заряжают чугунное
     hot:   { name: 'Калёное',  radius: 0.17, density: 20, damage: 1.0, hullDamage: 1.0, speedMul: 1, spread: 1.5, speedSpread: 0.04, reload: 4.0, color: '#c8501e', ignite: true },
+    // Бомбическое: полое ядро с порохом, крупнее и легче чугунного. Рвётся при первом ударе обо что угодно,
+    // кроме воды (упавшее в воду гаснет и тонет): осколки и ударная волна — CFG.blast
+    bomb:  { name: 'Бомбическое', radius: 0.2, density: 9, damage: 1.0, hullDamage: 1.0, speedMul: 0.95, spread: 1.8, speedSpread: 0.05, reload: 4.0, color: '#33302b', explosive: true },
+    // Осколок бомбы (игроку не выдаётся): квадрат со стороной 2 × radius, масса задаётся при взрыве
+    shard: { name: 'Осколок', radius: 0.05, density: 20, damage: 1.0, hullDamage: 1.0, speedMul: 1, spread: 0, speedSpread: 0, reload: 0, color: '#2a2622', shard: true },
     // Ядро малого калибра для пушек на крепости (игроку не выдаётся)
     light: { name: 'Лёгкое',   radius: 0.12, density: 20, damage: 1.0, hullDamage: 1.0, speedMul: 1, spread: 2.0, speedSpread: 0.05, reload: 2.0, color: '#3a3a3a' },
   },
@@ -117,26 +122,26 @@ const BASE_CFG = {
     // cannons — X каждой пушки на палубе. У пушки есть HP (gunHp); выбитую пушку команда чинит.
     // fireDelay — пауза между выстрелами каждой пушки отдельно.
     sloop: {
-      name: 'Шлюп', hp: 260, scale: 0.7, hullDensity: 1.2,
+      name: 'Шлюп', hp: 450, scale: 0.7, hullDensity: 1.2,
       speed: 0.9, fireDelay: [4.5, 6.5], aimError: 1.5,
       cannons: [-2.2], mastX: -0.2, mastHeight: 5, cabinCols: 4, cabinRows: 2,
     },
     frigate: {
-      name: 'Фрегат', hp: 420, scale: 0.9, hullDensity: 1.2,
+      name: 'Фрегат', hp: 720, scale: 0.9, hullDensity: 1.2,
       speed: 0.6, fireDelay: [5.0, 7.0], aimError: 1.0,
       cannons: [-2.6, -0.3], mastX: 0.6, mastHeight: 7, cabinCols: 3, cabinRows: 3,
     },
     // Парусно-паровой шлюп (как Virago): мачта и гребное колесо посередине борта, труба над колесом.
     // Колесо — отдельная мишень (wheelHp); потеря мачты или колеса — минус треть скорости каждое.
     steamer: {
-      name: 'Пароход', hp: 286, scale: 0.72, hullDensity: 1.2,
+      name: 'Пароход', hp: 500, scale: 0.72, hullDensity: 1.2,
       speed: 1.0, fireDelay: [4.5, 6.5], aimError: 1.5,
       cannons: [-2.4], mastX: -1.1, mastHeight: 5, cabinCols: 3, cabinRows: 2,
       wheel: { x: 0.3, r: 0.75 }, funnel: { x: 0.3, h: 1.7, w: 0.32 },
     },
     // Флагман: крупнее фрегата, три пушки, прочный корпус и большая рубка (много команды)
     flagship: {
-      name: 'Флагман', hp: 560, scale: 1.0, hullDensity: 1.2,
+      name: 'Флагман', hp: 960, scale: 1.0, hullDensity: 1.2,
       speed: 0.5, fireDelay: [5.0, 7.0], aimError: 1.0,
       cannons: [-2.6, -1.5, 0.0], mastX: -0.75, mastHeight: 8, cabinCols: 4, cabinRows: 3,
     },
@@ -172,7 +177,7 @@ const BASE_CFG = {
   // Затопление трюма: если кромка борта уходит под воду, вода льётся внутрь.
   flood: {
     inflowRate: 1.5,     // приток, м²/с на каждый м² "кромка × глубина" под водой
-    pumpFraction: 0.02,  // команда откачивает за секунду такую долю объёма трюма
+    pumpFraction: 0.026, // команда откачивает за секунду такую долю объёма трюма (0,02 × 1,3)
     sinkFraction: 0.55,  // трюм залит на эту долю — корабль тонет
   },
 
@@ -190,6 +195,14 @@ const BASE_CFG = {
     heatTime: 15,        // с: за столько ядро остывает (в воде — сразу)
     maxFires: 3,         // очагов на корабле (новое попадание рядом — усиливает очаг)
   },
+
+  // Взрыв бомбы: всё в радиусе radius получает долю урона (1 в точке взрыва → 0 на краю).
+  // hull — HP корпуса (расстояние — до корпуса или надстройки), gun — HP пушки/колеса, brick — HP доски/кирпича;
+  // joints — рвёт соединения кладки с такой вероятностью × доля; impulse — толчок досок, Н·с.
+  // Мачту взрыв не ломает (только прямое попадание, как и ударная волна).
+  // delay — с от первого удара до взрыва (в воде трубка гаснет). Осколки: по shardAngles (градусы от горизонта)
+  // вправо и влево, масса shardMass × массы бомбы, скорость shardSpeed, м/с.
+  blast: { delay: 0.5, shardAngles: [-20, 0, 20], shardMass: 0.1, shardSpeed: 30, radius: 1.8, hull: 120, gun: 90, brick: 55, joints: 1.0, impulse: 2.5 },
 
   // Земляной вал перед стеной (прокачка «Крепость»): статичный откос между стеной и пушкой игрока.
   // Принимает ядра на себя и не рушится; в целостность крепости не входит.

@@ -83,7 +83,7 @@ const Bot = {
     return out;
   },
 
-  // Прогон всех боёв по runs раз. Калёным, затем тяжёлым ядром бот стреляет, пока они есть.
+  // Прогон всех боёв по runs раз. Бомбами, калёным, затем тяжёлым ядром бот стреляет, пока они есть.
   // Bot.report: [{ id, wins, runs, results: [...] }]; Bot.done — закончил ли.
   async campaign({ profile = 'zero', runs = 3, passive = false, ids = null } = {}) {
     this.report = [];
@@ -93,7 +93,7 @@ const Bot = {
       const row = { id: level.id, n: level.n, wins: 0, runs, results: [] };
       this.report.push(row);
       for (let i = 0; i < runs; i++) {
-        const r = this.run(level.id, { profile, passive, ball: ['hot', 'heavy'] });
+        const r = this.run(level.id, { profile, passive, ball: ['bomb', 'hot', 'heavy'] });
         row.results.push(`${r.state} ${r.sunk} к${r.integrity} п${r.powder} ★${r.stars}`);
         if (r.state === 'win') row.wins++;
         await new Promise(res => setTimeout(res, 0)); // дать вкладке подышать

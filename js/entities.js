@@ -236,13 +236,19 @@ const Entities = {
   },
 
   // ---------- Ядро ----------
-  createBall(typeKey, owner, x, y, vx, vy) {
+  // opts.mass — задать массу (осколок бомбы); осколок — квадрат, осколки друг с другом не сталкиваются
+  createBall(typeKey, owner, x, y, vx, vy, opts = {}) {
     const B = CFG.balls[typeKey];
     const body = Physics.world.createBody({ type: 'dynamic', position: V(x, y), bullet: true });
-    body.createFixture(new pl.Circle(B.radius), { density: B.density, friction: 0.4, restitution: 0.25 });
+    const shape = B.shard ? new pl.Box(B.radius, B.radius) : new pl.Circle(B.radius);
+    const area = B.shard ? 4 * B.radius * B.radius : Math.PI * B.radius * B.radius;
+    body.createFixture(shape, { density: opts.mass ? opts.mass / area : B.density, friction: 0.4, restitution: 0.25,
+      filterGroupIndex: B.shard ? -7 : 0 });
+    if (B.shard) body.setAngularVelocity((Math.random() - 0.5) * 30);
     body.setLinearVelocity(V(vx, vy));
     // heat — накал калёного ядра (1 — из печи, 0 — остыло; у остальных всегда 0)
-    const ball = { kind: 'ball', type: typeKey, B, owner, body, hits: 0, age: 0, inWater: false, alive: true, heat: B.ignite ? 1 : 0 };
+    const ball = { kind: 'ball', type: typeKey, B, owner, body, hits: 0, age: 0, inWater: false, alive: true, heat: B.ignite ? 1 : 0,
+      fuse: !!B.explosive }; // fuse — бомба ещё может взорваться (в воде гаснет)
     body.setUserData(ball);
     return ball;
   },
@@ -279,6 +285,24 @@ const Particles = {
     for (let i = 0; i < 4; i++) {
       this.spawn({ type: 'smoke', x, y, vx: (Math.random() - 0.5) * 1.5, vy: Math.random(), g: 0.3,
         size: 0.2 + Math.random() * 0.3, life: 0.8 + Math.random() * 0.6, max: 1.4, color: [180, 170, 155] });
+    }
+  },
+  // Взрыв бомбы: вспышка огня, искры-осколки во все стороны, клуб тёмного дыма
+  blast(x, y) {
+    for (let i = 0; i < 26; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3.5;
+      this.spawn({ type: 'flame', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 0.8, g: 0,
+        size: 0.2 + Math.random() * 0.3, life: 0.2 + Math.random() * 0.25, max: 0.45, color: [255, 170 + Math.random() * 70 | 0, 60] });
+    }
+    for (let i = 0; i < 18; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 6 + Math.random() * 9;
+      this.spawn({ type: 'spark', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: -9.8,
+        size: 0.06, life: 0.25 + Math.random() * 0.25, max: 0.5, color: [255, 210, 110] });
+    }
+    for (let i = 0; i < 16; i++) {
+      this.spawn({ type: 'smoke', x: x + (Math.random() - 0.5) * 0.8, y: y + (Math.random() - 0.3) * 0.8,
+        vx: (Math.random() - 0.5) * 2, vy: 0.4 + Math.random() * 1.2, g: 0.4, size: 0.35 + Math.random() * 0.5,
+        life: 1.6 + Math.random() * 1.2, max: 2.8, color: [75, 70, 64] });
     }
   },
   update(dt) {

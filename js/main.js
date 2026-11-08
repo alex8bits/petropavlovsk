@@ -136,6 +136,8 @@ const Game = {
     // Каждый следующий отскок наносит меньше урона
     const hitFactor = Math.pow(0.5, ball.hits);
     ball.hits++;
+    // Бомба: первый удар (не о воду) поджигает трубку — взрыв через CFG.blast.delay (в Game.step)
+    if (ball.fuse && ball.fuseTimer == null) ball.fuseTimer = CFG.blast.delay;
     if (rel < CFG.brick.minImpactSpeed || !other) return;
     const energy = 0.5 * ball.body.getMass() * rel * rel * hitFactor;
     this.impacts.push({ ball, target: other, energy, x: pt.x, y: pt.y });
@@ -146,7 +148,7 @@ const Game = {
       const { ball, target, x, y } = imp;
       // Точность игрока: ядро его пушки задело корабль (считается один раз на ядро)
       if (ball.owner === 'player' && !ball.fromFort && !ball.scored &&
-          (target.kind === 'shipGun' || target.kind === 'wheel' || this.shipOf(target))) { ball.scored = true; this.hits++; }
+          !ball.B.shard && (target.kind === 'shipGun' || target.kind === 'wheel' || this.shipOf(target))) { ball.scored = true; this.hits++; }
       // Вражеские ядра бьют по кладке сильнее на CFG.ships.shellPower (по пушке — как раньше)
       const boost = ball.owner !== 'player' && target.kind === 'brick';
       const energy = boost ? imp.energy * CFG.ships.shellPower : imp.energy;
@@ -193,6 +195,77 @@ const Game = {
       }
     }
     this.impacts.length = 0;
+  },
+
+  // ---------- Бомба ----------
+  // Взрыв там, где бомба сейчас: доля k = 1 − d/R урона CFG.blast всему, что в радиусе R, и осколки
+  explode(ball) {
+    const X = CFG.blast, R = X.radius, bp = ball.body.getPosition(), x = bp.x, y = bp.y;
+    const mass = ball.body.getMass();
+    ball.alive = false; ball.fuse = false;
+    Physics.world.destroyBody(ball.body);
+    this.shards(ball, x, y, mass);
+    const share = d => Math.max(0, 1 - d / R);
+    let hurt = false;
+    for (const s of this.ships) {
+      if (!s.alive) continue;
+      // Расстояние — до корпуса (в трюме — 0) или ближайшей доски надстройки
+      let d = this.distToBody(s.hull, x, y);
+      for (const b of s.bricks) if (b.alive && d > 0) d = Math.min(d, this.distToBody(b.body, x, y));
+      const k = share(d);
+      if (k <= 0) continue;
+      hurt = true;
+      s.hp -= X.hull * k;
+      // Пушки и колесо: осколки по каждой в радиусе
+      const parts = s.cannons.filter(g => g.alive).map(g => ({ g, p: Entities.cannonWorld(s, g), kill: () => this.destroyShipGun(g, x, y) }));
+      if (s.wheel && s.wheel.alive) parts.push({ g: s.wheel, p: s.hull.getWorldPoint(V(s.wheel.local.x, s.wheel.local.y)), kill: () => this.breakWheel(s.wheel, x, y) });
+      for (const { g, p, kill } of parts) {
+        const kg = share(Math.max(0, Math.hypot(p.x - x, p.y - y) - 0.3));
+        if (kg <= 0) continue;
+        g.hp -= X.gun * kg;
+        if (g.hp <= 0) kill();
+      }
+      if (s.hp <= 0) this.killShip(s);
+    }
+    if (hurt && ball.owner === 'player' && !ball.fromFort && !ball.scored) { ball.scored = true; this.hits++; }
+    // Доски и кирпичи: урон, разрыв соединений, толчок от центра
+    for (const br of this.allBricks()) {
+      if (!br.alive || br.tag === 'mast') continue;
+      const p = br.body.getPosition(), d = Math.hypot(p.x - x, p.y - y), k = share(d);
+      if (k <= 0) continue;
+      for (const j of [...br.joints]) if (Math.random() < k * X.joints) Physics.breakJoint(j);
+      const n = d > 0.01 ? { x: (p.x - x) / d, y: (p.y - y) / d } : { x: 0, y: 1 };
+      br.body.applyLinearImpulse(V(n.x * X.impulse * k, (n.y + 0.3) * X.impulse * k), p, true);
+      this.damageBrick(br, X.brick * k);
+    }
+    Sound.event('blast', { x, power: 1 });
+    Particles.blast(x, y);
+  },
+
+  // Осколки: по CFG.blast.shardAngles вправо и столько же влево, квадратики массой shardMass × массы бомбы.
+  // Это ядра типа shard — бьют всё, во что попадут, как обычные (в точность игрока не идут)
+  shards(bomb, x, y, mass) {
+    const X = CFG.blast, B = CFG.balls.shard;
+    for (const side of [1, -1]) for (const deg of X.shardAngles) {
+      const a = deg * Math.PI / 180, dx = side * Math.cos(a), dy = Math.sin(a);
+      const off = bomb.B.radius + B.radius;
+      const s = Entities.createBall('shard', bomb.owner, x + dx * off, y + dy * off, dx * X.shardSpeed, dy * X.shardSpeed,
+        { mass: mass * X.shardMass });
+      s.fromFort = bomb.fromFort;
+      this.balls.push(s);
+    }
+  },
+
+  // Расстояние от точки до фигур тела (по их AABB), 0 — внутри
+  distToBody(body, x, y) {
+    let best = Infinity;
+    for (let f = body.getFixtureList(); f; f = f.getNext()) {
+      if (f.isSensor()) continue;
+      const a = f.getAABB(0);
+      const dx = Math.max(a.lowerBound.x - x, 0, x - a.upperBound.x), dy = Math.max(a.lowerBound.y - y, 0, y - a.upperBound.y);
+      best = Math.min(best, Math.hypot(dx, dy));
+    }
+    return best;
   },
 
   // Звук удара: по материалу цели, громкость — от энергии (≈ 400 Дж — полный заряд чугунным)
@@ -687,12 +760,17 @@ const Game = {
         Particles.splash(p.x, surf, Math.abs(v.y));
         Sound.event('splash', { x: p.x, power: Math.abs(v.y) / 14 });
         if (b.heat > 0) { b.heat = 0; Particles.smoke(p.x, surf, 0, 1, 5); } // калёное шипит и гаснет
+        b.fuse = false; // бомба в воде гаснет и тонет, не взорвавшись
       }
       if (b.heat > 0) {
         b.heat = Math.max(0, b.heat - dt / CFG.fire.heatTime);
         // Калёное ядро в трюме поджигает корабль изнутри, пока не остынет
         if (inHold && inHold.alive) this.ignite(inHold, p.x, p.y, CFG.fire.holdFeed * b.heat * dt);
       }
+      // Трубка подожжена ударом — бомба рвётся, где окажется через delay (если не упала в воду)
+      if (b.fuse && b.fuseTimer != null && (b.fuseTimer -= dt) <= 0) { this.explode(b); continue; }
+      if (b.fuse && Math.random() < dt * 20) Particles.spawn({ type: 'spark', x: p.x, y: p.y + b.B.radius, vx: (Math.random() - 0.5) * 1.5,
+        vy: 0.5 + Math.random(), g: -4, size: 0.04, life: 0.2, max: 0.2, color: [255, 200, 90] });
       b.inWater = inWater;
       if (inWater) Physics.applyBuoyancySimple(b.body, Math.PI * b.B.radius * b.B.radius, b.B.radius);
       const resting = !inHold && ((b.age > 3 && Math.hypot(v.x, v.y) < 0.3) || b.age > 12);
