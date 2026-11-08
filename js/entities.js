@@ -155,6 +155,7 @@ const Entities = {
       name: opts.name || T.name, flag: opts.flag || 'uk', speedMul: opts.speedMul || 1, retreat: false,
       leaveAt: opts.leaveAt ?? null, // с от начала боя: тогда корабль уходит (не потопили — бой проигран)
       cannons: [], bricks: [], removed: false,
+      leaks: [], // пробоины от осколков: { left } — с работы команды до заделки
       fires: [], // очаги пожара: { x, y } в координатах корпуса, power 0…1
     };
     ship.holdArea = Physics.polyArea(ship.hold);

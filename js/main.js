@@ -95,15 +95,20 @@ const Game = {
     return ball.owner !== 'player' && this.shipOf(ud) === ball.owner;
   },
 
-  // Ядро и мачта: задевает с вероятностью mastHitChance. Решение принимается один раз
-  // для пары «ядро — мачта корабля» и держится, пока ядро пролетает сквозь все её бруски.
-  passesMast(ball, ud) {
-    if (!ud || ud.kind !== 'brick' || ud.tag !== 'mast') return false;
-    if (!ball.mastRolls) ball.mastRolls = new Map();
-    let pass = ball.mastRolls.get(ud.owner);
+  // Тонкие цели (мачта, пушки): ядро задевает их лишь с вероятностью *HitChance. Решение принимается
+  // один раз для пары «ядро — цель» и держится, пока ядро пролетает сквозь неё (у мачты — все бруски).
+  passesThin(ball, ud) {
+    if (!ud) return false;
+    let key, chance;
+    if (ud.kind === 'brick' && ud.tag === 'mast') { key = ud.owner; chance = CFG.ships.mastHitChance; }
+    else if (ud.kind === 'shipGun') { key = ud; chance = CFG.ships.gunHitChance; }
+    else if (ud.kind === 'fortGun') { key = ud; chance = CFG.fortGuns.hitChance; }
+    else return false;
+    if (!ball.rolls) ball.rolls = new Map();
+    let pass = ball.rolls.get(key);
     if (pass === undefined) {
-      pass = Math.random() >= CFG.ships.mastHitChance;
-      ball.mastRolls.set(ud.owner, pass);
+      pass = Math.random() >= chance;
+      ball.rolls.set(key, pass);
     }
     return pass;
   },
@@ -117,8 +122,8 @@ const Game = {
       if (sa && sb && sa !== sb) contact.setEnabled(false);
       return;
     }
-    const ud = bc.body.getUserData();
-    if (this.ownHit(bc.ball, ud) || this.passesMast(bc.ball, ud)) contact.setEnabled(false);
+    const ud = bc.body.getUserData(), target = bc.fix.getUserData() || ud;
+    if (this.ownHit(bc.ball, ud) || this.passesThin(bc.ball, target)) contact.setEnabled(false);
   },
 
   onContact(contact) {
@@ -126,7 +131,7 @@ const Game = {
     if (!bc || !bc.ball.alive || bc.fix.isSensor()) return;
     const { ball, fix, body: otherBody } = bc;
     const other = fix.getUserData() || otherBody.getUserData();
-    if (this.ownHit(ball, otherBody.getUserData()) || this.passesMast(ball, otherBody.getUserData())) return;
+    if (this.ownHit(ball, otherBody.getUserData()) || this.passesThin(ball, other)) return;
 
     const wm = contact.getWorldManifold(null);
     const pt = wm && wm.points && wm.points[0] ? wm.points[0] : ball.body.getPosition();
@@ -177,6 +182,7 @@ const Game = {
         if (target.hp <= 0) this.breakWheel(target, x, y);
       } else if (target.kind === 'hull' && target.alive) {
         target.hp -= energy * CFG.ships.damagePerJoule * ball.B.hullDamage;
+        if (ball.B.shard && Math.random() < CFG.flood.leak.chance) this.holeHull(target, x, y);
         this.shockwave(x, y, energy * 0.7);
         Particles.debris(x, y, CFG.brick.wood.color, 10);
         if (target.hp <= 0) this.killShip(target);
@@ -786,6 +792,24 @@ const Game = {
       if (b.fuse && b.fuseTimer != null && (b.fuseTimer -= dt) <= 0) { this.explode(b); continue; }
       if (this.fuseVisible(b) && Math.random() < dt * 20) Particles.spawn({ type: 'spark', x: p.x, y: p.y + b.B.radius, vx: (Math.random() - 0.5) * 1.5,
         vy: 0.5 + Math.random(), g: -4, size: 0.04, life: 0.2, max: 0.2, color: [255, 200, 90] });
+      // Команда выбрасывает ядра из трюма: работа идёт × доля команды; последние fade с масса плавно падает (без рывка корпуса), потом ядро исчезает
+      if (inHold && inHold.alive) b.jettison = (b.jettison || 0) + dt * inHold.crew;
+      const J = CFG.ships.jettison;
+      if (b.jettison != null && b.jettison >= J.time - J.fade) {
+        if (b.jettison >= J.time) {
+          b.alive = false;
+          Physics.world.destroyBody(b.body);
+          continue;
+        }
+        if (!b.baseMass) {
+          const md = { mass: 0, center: V(0, 0), I: 0 };
+          b.body.getMassData(md);
+          b.baseMass = { mass: md.mass, center: V(md.center.x, md.center.y), I: md.I };
+        }
+        const k = Math.max(J.minMass, (J.time - b.jettison) / J.fade);
+        b.fade = k;
+        b.body.setMassData({ mass: b.baseMass.mass * k, center: b.baseMass.center, I: b.baseMass.I * k });
+      }
       b.inWater = inWater;
       if (inWater) Physics.applyBuoyancySimple(b.body, Math.PI * b.B.radius * b.B.radius, b.B.radius);
       const resting = !inHold && ((b.age > 3 && Math.hypot(v.x, v.y) < 0.3) || b.age > 12);
@@ -832,6 +856,14 @@ const Game = {
     s.crew = total ? C + (1 - C) * intact / total : 1;
   },
 
+  // Осколок пробил борт: вода идёт в трюм, пока команда не заделает (место пробоины не моделируем)
+  holeHull(ship, x, y) {
+    const L = CFG.flood.leak;
+    if (ship.leaks.length < L.max) ship.leaks.push({ left: L.patchTime });
+    else ship.leaks[ship.leaks.length - 1].left = L.patchTime;
+    Particles.splash(x, y, 4);
+  },
+
   // Вода в трюме: заливается через борт, ушедший под воду, команда её откачивает.
   // Вода переливается к нижнему борту (центр тяжести — у реального многоугольника воды).
   updateFlooding(s, dt) {
@@ -847,6 +879,13 @@ const Game = {
     // Корабль с палубой: вода идёт через люки и порты, а не через весь борт — приток не больше maxInflow трюма в секунду
     s.inflow = Math.min(inflow * F.inflowRate, s.holdArea * F.maxInflow);
     s.water += s.inflow * dt;
+    // Пробоины от осколков: каждая льёт leak.inflow трюма в секунду, команда заделывает (× доля команды)
+    if (s.alive && s.leaks.length) {
+      const L = F.leak;
+      s.water += s.holdArea * L.inflow * s.leaks.length * dt;
+      for (const h of s.leaks) h.left -= dt * s.crew;
+      s.leaks = s.leaks.filter(h => h.left > 0);
+    }
     if (s.alive) s.water -= s.holdArea * F.pumpFraction * s.crew * dt; // откачивает оставшаяся команда
     s.water = Math.max(0, Math.min(s.holdArea, s.water));
 

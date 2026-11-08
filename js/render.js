@@ -568,6 +568,7 @@ const Render = {
 
   drawBall(b) {
     const ctx = this.ctx, p = b.body.getPosition();
+    if (b.fade != null) { ctx.save(); ctx.globalAlpha = b.fade; } // ядро, которое выбрасывают, бледнеет
     ctx.fillStyle = b.B.color;
     // Калёное ядро светится, пока не остыло, и темнеет до чугунного
     if (b.B.ignite) {
@@ -586,6 +587,7 @@ const Render = {
       const h = b.B.radius * this.s;
       ctx.save(); ctx.translate(this.X(p.x), this.Y(p.y)); ctx.rotate(-b.body.getAngle());
       ctx.fillRect(-h, -h, 2 * h, 2 * h); ctx.restore();
+      if (b.fade != null) ctx.restore();
       return;
     }
     ctx.beginPath(); ctx.arc(this.X(p.x), this.Y(p.y), b.B.radius * this.s, 0, Math.PI * 2); ctx.fill();
@@ -602,6 +604,7 @@ const Render = {
     ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.beginPath(); ctx.arc(this.X(p.x - b.B.radius * 0.3), this.Y(p.y + b.B.radius * 0.3), b.B.radius * 0.35 * this.s, 0, Math.PI * 2); ctx.fill();
+    if (b.fade != null) ctx.restore();
   },
 
   // Высота берега/дна в точке x (тот же профиль, что у физического тела берега)
