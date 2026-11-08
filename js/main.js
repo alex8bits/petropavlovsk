@@ -844,7 +844,8 @@ const Game = {
       const depth = Physics.waterY(p.x) - p.y;
       if (depth > 0) inflow += depth * seg;
     }
-    s.inflow = inflow * F.inflowRate;
+    // Корабль с палубой: вода идёт через люки и порты, а не через весь борт — приток не больше maxInflow трюма в секунду
+    s.inflow = Math.min(inflow * F.inflowRate, s.holdArea * F.maxInflow);
     s.water += s.inflow * dt;
     if (s.alive) s.water -= s.holdArea * F.pumpFraction * s.crew * dt; // откачивает оставшаяся команда
     s.water = Math.max(0, Math.min(s.holdArea, s.water));
@@ -852,8 +853,10 @@ const Game = {
     const poly = s.hold.map(v => hull.getWorldPoint(V(v.x, v.y)));
     s.waterPoly = Physics.fillVessel(poly, s.water);
     if (s.waterPoly) {
-      const c = Physics.polyCentroid(s.waterPoly);
-      hull.applyForce(V(0, -CFG.water.density * CFG.world.gravity * s.water), V(c.x, c.y), true);
+      // Палубы и переборки не дают всей воде скатиться к нижнему борту: смещение центра воды от оси × slosh
+      const lc = hull.getLocalPoint(Physics.polyCentroid(s.waterPoly));
+      const c = hull.getWorldPoint(V(lc.x * F.slosh, lc.y));
+      hull.applyForce(V(0, -CFG.water.density * CFG.world.gravity * s.water), c, true);
     }
     if (s.alive && s.water >= s.holdArea * F.sinkFraction) { s.floodSunk = true; this.killShip(s); }
   },
