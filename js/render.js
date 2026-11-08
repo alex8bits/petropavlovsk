@@ -752,12 +752,25 @@ const Render = {
     ctx.fillText('↑↓ / колесо — угол · ←→ — порох', px + 12 * u, py + 113 * u);
     ctx.fillText('Пробел — выстрел · Q — ядро · Esc — пауза', px + 12 * u, py + 129 * u);
 
-    // Сенсорный экран: ▲ ▼ справа от панели, не меньше 40 CSS-пикселей
+    // Сенсорный экран: внизу под большими пальцами — ▲ ▼ слева, «Огонь!» справа (не меньше 40 CSS-пикселей)
     this.holds = [];
-    this.hudRight = px + pw;
     if (this.touch) {
-      const bs = Math.max(56 * u, 40 * d), bx = px + pw + 8 * u;
-      [['ArrowUp', '▲', py], ['ArrowDown', '▼', py + bs + 6 * u]].forEach(([key, label, by]) => {
+      const bs = Math.max(56 * u, 40 * d), m = Math.max(12 * u, 10 * d);
+      const W = this.canvas.width, H = this.canvas.height, bx = m, gap = 6 * d;
+      const fw = bs * 2.2, fx = W - m - fw, fy = H - m - bs;
+      ctx.fillStyle = ready ? '#c0392b' : 'rgba(15, 25, 35, 0.72)';
+      this.roundRect(fx, fy, fw, bs, 8 * u); ctx.fill();
+      if (!reloaded) {
+        ctx.fillStyle = 'rgba(192,57,43,0.6)';
+        this.roundRect(fx, fy, fw * (1 - c.reload / B.reload), bs, 8 * u); ctx.fill();
+      }
+      ctx.fillStyle = '#fff';
+      ctx.font = `${bs * 0.36}px ${this.FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText(c.repair > 0 ? 'Ремонт' : !reloaded ? 'Заряжаем' : enough ? 'Огонь!' : 'Мало пороха', fx + fw / 2, fy + bs / 2);
+      ctx.textAlign = 'left';
+      this.buttons.push({ x: fx, y: fy, w: fw, h: bs, fn: () => game.playerFire() });
+      [['ArrowUp', '▲', H - m - 2 * bs - gap], ['ArrowDown', '▼', H - m - bs]].forEach(([key, label, by]) => {
         ctx.fillStyle = game.keys[key] ? '#c99a52' : 'rgba(15, 25, 35, 0.72)';
         this.roundRect(bx, by, bs, bs, 8 * u); ctx.fill();
         ctx.fillStyle = game.keys[key] ? '#2a1c0c' : '#fff';
@@ -767,7 +780,6 @@ const Render = {
         ctx.textAlign = 'left';
         this.holds.push({ x: bx, y: by, w: bs, h: bs, key });
       });
-      this.hudRight = bx + bs;
     }
 
     // Правая панель: состояние
@@ -837,7 +849,7 @@ const Render = {
       }
     }
     // Плашка: в промежутке между левой и правой панелями
-    const left = Math.max(324 * u, this.hudRight + 12 * u), right = W - 274 * u, bw = Math.min(560 * u, right - left), bx = (left + right - bw) / 2, by = 12 * u;
+    const left = 324 * u, right = W - 274 * u, bw = Math.min(560 * u, right - left), bx = (left + right - bw) / 2, by = 12 * u;
     ctx.font = `${15 * u}px ${this.FONT}`;
     const lines = this.wrap(h.text, bw - 28 * u);
     const bh = 34 * u + lines.length * 21 * u;
